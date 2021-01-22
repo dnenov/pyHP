@@ -1,5 +1,5 @@
-__title__ = "Min area"
-__doc__ = "Fill in minimal area requirement based on a formatted excel file"
+__title__ = "Min room area"
+__doc__ = "Fill in minimal area requirement for a room based on a formatted excel file. The minimum area is deduced from the room name and the unit type (number of bed spaces)"
 
 from pyrevit import revit, DB, forms
 import xlrd
