@@ -1,17 +1,14 @@
-__title__ = "Min room area"
-__doc__ = "Fill in minimal area requirement for a room based on a formatted excel file. The minimum area is deduced from the room name and the unit type (number of bed spaces)"
+__title__ = "Min area"
+__doc__ = "Fill in minimal area requirement based on a formatted excel file"
 
 from pyrevit import revit, DB, forms
 import xlrd
+from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 
-
-# get document length units for conversion later
-d_units = DB.Document.GetUnits(revit.doc).GetFormatOptions(DB.UnitType.UT_Area).DisplayUnits
-
-
-def convert_to_internal(from_units, to_units=d_units):
+def convert_to_internal(from_units):
     # convert project units to internal
-    converted = DB.UnitUtils.ConvertToInternalUnits(from_units, to_units)
+    d_units = DB.Document.GetUnits(revit.doc).GetFormatOptions(DB.UnitType.UT_Area).DisplayUnits
+    converted = DB.UnitUtils.ConvertToInternalUnits(from_units, d_units)
     return converted
 
 
@@ -34,42 +31,57 @@ good_rooms = [r for r in coll_rooms if r.Area != 0]
 
 # a list of variations for Living / Dining / Kitchen room name
 lkd_var = ["LKD",
-            "LDK",
-            "KLD",
-            "KDL",
-            "DKL",
-            "DLK",
-            "Living",
-            "Kitchen",
-            "Dining",
-            "L/K/D",
-            "L/D/K",
-            "K/L/D",
-            "K/D/L",
-            "D/K/L",
-            "D/L/K",
-            "L-K-D",
-            "L-D-K",
-            "K-L-D",
-            "K-D-L",
-            "D-K-L",
-            "D-L-K",
-            ]
+           "LDK",
+           "KLD",
+           "KDL",
+           "DKL",
+           "DLK",
+           "Living",
+           "Kitchen",
+           "Dining",
+           "L/K/D",
+           "L/D/K",
+           "K/L/D",
+           "K/D/L",
+           "D/K/L",
+           "D/L/K",
+           "L-K-D",
+           "L-D-K",
+           "K-L-D",
+           "K-D-L",
+           "D-K-L",
+           "D-L-K",
+           ]
 
-with revit.Transaction("Write Parameter", revit.doc):
-    for room in good_rooms:
-        # get room parameters
-        area_req = room.LookupParameter("Area Requirement")
-        unit_type = room.LookupParameter("Unit Type").AsString()
-        room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString()
-        # check if Living/Kitchen/Dining is written differently
-        if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
-            room_name = "Living / Dining / Kitchen"
-        # look for room in dictionary and set Area Requirement value
-        try:
-            get_req = area_dict[unit_type][room_name]
-            area_req.Set(convert_to_internal(get_req))
-        except:
-            area_req.Set(0)
+element_parameter_set = good_rooms[0].Parameters
 
-    revit.doc.Regenerate()
+
+room_params = [p.Definition.Name for p in element_parameter_set if
+               p.StorageType.ToString() == "Double" and p.IsReadOnly == False]
+
+room_params.sort()
+
+components = [Label("Select room parameter to populate"), ComboBox("room_tx_params", room_params, default="Area Requirement"), Button ("Select")]
+form = FlexForm("Select Parameter", components)
+form.show()
+selected_parameter = form.values["room_tx_params"]
+
+if selected_parameter:
+    with revit.Transaction("Write Parameter", revit.doc):
+        for room in good_rooms:
+            # get room parameters
+            area_req = room.LookupParameter(selected_parameter)
+            unit_type = room.LookupParameter("Unit Type").AsString()
+            room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString()
+            # check if Living/Kitchen/Dining is written differently
+            if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
+                room_name = "Living / Dining / Kitchen"
+            # look for room in dictionary and set Area Requirement value
+            try:
+                get_req = area_dict[unit_type][room_name]
+                area_req.Set(convert_to_internal(get_req))
+            except:
+                area_req.Set(0)
+
+
+
