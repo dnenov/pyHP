@@ -78,19 +78,15 @@ form = FlexForm("Pick Parameter", components)
 form.show()
 # assign chosen parameters
 chosen_win_param = form.values["win_combobox1"]
-count = 0
-print (chosen_win_param)
+
 with revit.Transaction("Windows Orientation"):
     for window in coll_windows:
         host_wall = window.Host
         wall_face_ref = DB.HostObjectUtils.GetSideFaces(host_wall, DB.ShellLayerType.Exterior)[0]
         ext_side = revit.doc.GetElement(wall_face_ref).GetGeometryObjectFromReference(wall_face_ref)
         normal_to_wall = ext_side.FaceNormal.Normalize()
-
         window_orientation = get_orientation_by_normal(normal_to_wall)
-        #        print("Orientation: {}".format(window_orientation))
-        count +=1
-        print (count)
+
         # TODO: chaned this ugly bit
         if chosen_win_param.Definition.Name == "Mark":
             change = window.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK).Set(str(window_orientation))
