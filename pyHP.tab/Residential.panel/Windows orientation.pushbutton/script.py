@@ -6,19 +6,6 @@ from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import math
 
 
-def param_set_by_cat(cat):
-    # get all project type parameters of a given category
-    # can be used to gather parameters for UI selection
-    collect_els = DB.FilteredElementCollector(revit.doc).OfCategory(cat).WhereElementIsNotElementType().ToElements()
-    parameter_set = []
-    for el in collect_els:
-        params = el.Parameters
-        for p in params:
-            if p not in parameter_set and p.IsReadOnly == False:
-                parameter_set.append(p)
-    return parameter_set
-
-
 def get_true_north_angle():
     # get project's angle to True North
     pbp = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_ProjectBasePoint).FirstElement()
@@ -68,6 +55,8 @@ def get_orientation_by_normal(normal):
     elif 80 <= angle_x <= 100 and angle_y <= 10:
         orientation = "North"
 
+    else:
+        orientation = "Blank"
     return orientation
 
 
@@ -75,12 +64,11 @@ def get_orientation_by_normal(normal):
 coll_windows = DB.FilteredElementCollector(revit.doc).OfCategory(
     DB.BuiltInCategory.OST_Windows).WhereElementIsNotElementType().ToElements()
 
-win_parameter_set = param_set_by_cat(DB.BuiltInCategory.OST_Windows)
+win_parameter_set = coll_windows[0].Parameters
 win_params_text = [p for p in win_parameter_set if p.StorageType.ToString() == "String" and p.Definition.VariesAcrossGroups]
 win_params_text.append(coll_windows[0].get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK))
 
 win_dict1 = {p.Definition.Name: p for p in win_params_text}
-
 # construct rwp UI
 components = [
     Label("Which Windows parameter to populate:\n Must Vary across groups"),
@@ -90,7 +78,8 @@ form = FlexForm("Pick Parameter", components)
 form.show()
 # assign chosen parameters
 chosen_win_param = form.values["win_combobox1"]
-
+count = 0
+print (chosen_win_param)
 with revit.Transaction("Windows Orientation"):
     for window in coll_windows:
         host_wall = window.Host
@@ -100,5 +89,10 @@ with revit.Transaction("Windows Orientation"):
 
         window_orientation = get_orientation_by_normal(normal_to_wall)
         #        print("Orientation: {}".format(window_orientation))
-
-        window.get_Parameter(chosen_win_param).Set(str(window_orientation))
+        count +=1
+        print (count)
+        # TODO: chaned this ugly bit
+        if chosen_win_param.Definition.Name == "Mark":
+            change = window.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK).Set(str(window_orientation))
+        else:
+            change = window.get_Parameter(chosen_win_param.GUID).Set(str(window_orientation))
