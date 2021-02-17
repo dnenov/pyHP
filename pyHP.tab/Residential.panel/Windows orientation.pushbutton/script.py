@@ -1,4 +1,4 @@
-__title__ = "Windows Orientation"
+__title__ = "Windows \nOrientation"
 __doc__ = "Populate a window parameter with Orientation"
 
 from pyrevit import revit, DB, script, forms, HOST_APP
@@ -101,4 +101,4 @@ with revit.Transaction("Windows Orientation"):
         window_orientation = get_orientation_by_normal(normal_to_wall)
         #        print("Orientation: {}".format(window_orientation))
 
-        window.get_Parameter(DB.BuiltInParameter.ALL_MODEL_MARK).Set(str(window_orientation))
+        window.get_Parameter(chosen_win_param).Set(str(window_orientation))
