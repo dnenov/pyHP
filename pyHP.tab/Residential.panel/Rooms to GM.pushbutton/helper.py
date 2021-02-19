@@ -6,7 +6,7 @@ from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit import Exceptions
 import tempfile
 import rpw
-
+from pyrevit.revit.db import query
 
 # selection filter for rooms
 class RoomsFilter(ISelectionFilter):
@@ -110,3 +110,27 @@ def get_ref_lvl_plane (family_doc):
     # from given family doc, return Ref. Level reference plane
     find_planes = DB.FilteredElementCollector(family_doc).OfClass(DB.SketchPlane)
     return [plane for plane in find_planes if plane.Name == "Ref. Level"]
+
+
+
+def get_fam(some_name):
+    fam_name_filter = query.get_biparam_stringequals_filter({DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM: some_name})
+    found_fam = DB.FilteredElementCollector(revit.doc) \
+        .OfCategory(DB.BuiltInCategory.OST_GenericModel) \
+        .WherePasses(fam_name_filter) \
+        .WhereElementIsNotElementType().ToElements()
+
+    return found_fam
+
+
+def get_family_slow_way(name):
+    # look for loaded families, workaround to deal with extra space
+    get_loaded = DB.FilteredElementCollector(revit.doc) \
+        .OfCategory(DB.BuiltInCategory.OST_GenericModel) \
+        .WhereElementIsNotElementType() \
+        .ToElements()
+    if get_loaded:
+        for el in get_loaded:
+            el_f_name = el.get_Parameter(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM).AsString()
+            if el_f_name.strip(" ") == name:
+                return el
