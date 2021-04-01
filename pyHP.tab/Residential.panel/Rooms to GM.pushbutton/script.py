@@ -7,6 +7,8 @@ import tempfile
 import helper
 from pyrevit.revit.db import query
 
+logger = script.get_logger()
+
 # use preselected elements, filtering rooms only
 pre_selection = helper.preselection_with_filter("Rooms")
 # or select rooms
@@ -51,12 +53,6 @@ if selection:
         # collect room boundaries and translate them to origin
         room_boundaries = helper.room_bound_to_origin(room, geo_translation)
 
-        # get shared parameter for the extrusion material
-        try:
-            sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", DB.ParameterType.Material)
-        finally:
-            pass
-
         # define new family doc
         new_family_doc = revit.doc.Application.NewFamilyDocument(fam_template_path)
         # Name the Family ( Proj_Ten_Type_Name : Ten_Type)
@@ -99,24 +95,22 @@ if selection:
 
         # Load Family into project
         with revit.Transaction("Load Family", revit.doc):
-            loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
-            revit.doc.Regenerate()
+            try:
+                loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
+                revit.doc.Regenerate()
+            except Exception as err:
+                logger.error(err)
 
         # Create extrusion from room boundaries
         with revit.Transaction(doc=new_family_doc, name="Create Extrusion"):
-
-            extrusion_height = helper.convert_to_internal(2500)
-            ref_plane = helper.get_ref_lvl_plane(new_family_doc)
-            # create extrusion, assign material, associate with shared parameter
-            extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
-                                                                     extrusion_height)
-            #ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
-            #try:
-                #new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
-                                                                          #DB.BuiltInParameterGroup.PG_MATERIALS, False)
-                #new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
-            #finally:
-                #pass
+            try:
+                extrusion_height = helper.convert_to_internal(2500)
+                ref_plane = helper.get_ref_lvl_plane(new_family_doc)
+                # create extrusion, assign material, associate with shared parameter
+                extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
+                                                                         extrusion_height)
+            except Exception as err:
+                logger.error(err)
 
         # save and close family
         save_opt = DB.SaveOptions()
@@ -125,29 +119,29 @@ if selection:
 
         # Reload family with extrusion and place it in the same position as the room
         with revit.Transaction("Reload Family", revit.doc):
-            loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
-            revit.doc.Regenerate()
-            str_type = DB.Structure.StructuralType.NonStructural
-            # find family symbol and activate
-            fam_symbol = None
-            get_fam = DB.FilteredElementCollector(revit.doc).OfClass(DB.FamilySymbol).OfCategory(
-                DB.BuiltInCategory.OST_GenericModel).WhereElementIsElementType().ToElements()
-            for fam in get_fam:
-                type_name = fam.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
-                if str.strip(type_name) == fam_name:
-                    fam_symbol = fam
-                    fam_symbol.Name = fam_type_name
-                    # set type parameters
-                    fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
-                    #                    fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(room_type_instance)
-                    #                    fam_symbol.LookupParameter(chosen_gm_param3.Definition.Name).Set(room_tenure)
-                    #                    fam_symbol.LookupParameter("Unit Material").Set(chosen_mat.Id)
-                    if not fam_symbol.IsActive:
-                        fam_symbol.Activate()
-                        revit.doc.Regenerate()
+            try:
+                loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
+                revit.doc.Regenerate()
+                str_type = DB.Structure.StructuralType.NonStructural
+                # find family symbol and activate
+                fam_symbol = None
+                get_fam = DB.FilteredElementCollector(revit.doc).OfClass(DB.FamilySymbol).OfCategory(
+                    DB.BuiltInCategory.OST_GenericModel).WhereElementIsElementType().ToElements()
+                for fam in get_fam:
+                    type_name = fam.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
+                    if str.strip(type_name) == fam_name:
+                        fam_symbol = fam
+                        fam_symbol.Name = fam_type_name
+                        # set type parameters
+                        fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
+                        if not fam_symbol.IsActive:
+                            fam_symbol.Activate()
+                            revit.doc.Regenerate()
 
-                    # place family symbol at postision
-                    new_fam_instance = revit.doc.Create.NewFamilyInstance(room.Location.Point, fam_symbol, room.Level,
-                                                                          str_type)
-                    correct_lvl_offset = new_fam_instance.get_Parameter(
-                        DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
+                        # place family symbol at postision
+                        new_fam_instance = revit.doc.Create.NewFamilyInstance(room.Location.Point, fam_symbol, room.Level,
+                                                                              str_type)
+                        correct_lvl_offset = new_fam_instance.get_Parameter(
+                            DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
+            except Exception as err:
+                logger.error(err)
