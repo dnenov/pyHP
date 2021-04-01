@@ -110,13 +110,13 @@ if selection:
             # create extrusion, assign material, associate with shared parameter
             extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
                                                                      extrusion_height)
-            ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
-            try:
-                new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
-                                                                          DB.BuiltInParameterGroup.PG_MATERIALS, False)
-                new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
-            finally:
-                pass
+            #ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+            #try:
+                #new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
+                                                                          #DB.BuiltInParameterGroup.PG_MATERIALS, False)
+                #new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
+            #finally:
+                #pass
 
         # save and close family
         save_opt = DB.SaveOptions()
