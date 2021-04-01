@@ -113,19 +113,19 @@ if selected_parameter:
             if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
                 room_name = "Living / Dining / Kitchen"
             #format unit type
-            if "1B1P" in unit_type:
+            if "1B1P" in unit_type or "1B 1P" in unit_type:
                 unit_type = "1B1P"
-            elif "1B2P" in unit_type:
+            elif "1B2P" in unit_type or "1B 2P" in unit_type :
                 unit_type = "1B2P"
-            elif "2B3P" in unit_type:
+            elif "2B3P" in unit_type or "2B 3P" in unit_type:
                 unit_type = "2B3P"
-            elif "2B4P" in unit_type:
+            elif "2B4P" in unit_type or "2B 4P" in unit_type:
                 unit_type = "2B4P"
-            elif "3B5P" in unit_type:
+            elif "3B5P" in unit_type or "3B 5P" in unit_type:
                 unit_type = "3B5P"
-            elif "3B6P" in unit_type:
+            elif "3B6P" in unit_type or "3B 6P" in unit_type:
                 unit_type = "3B6P"
-            elif "4B6P" in unit_type:
+            elif "4B6P" in unit_type or "4B 6P" in unit_type:
                 unit_type = "4B6P"
 
             # look for room in dictionary and set Area Requirement value
