@@ -17,6 +17,9 @@ coll_rooms = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategor
 # take only placed rooms
 good_rooms = [r for r in coll_rooms if r.Area != 0]
 
+if not good_rooms:
+    forms.alert(msg="No rooms", sub_msg = "There are no placed rooms in model", ok=True, warn_icon=True, exitscript=True)
+
 element_parameter_set = good_rooms[0].Parameters
 
 room_params = [p.Definition.Name for p in element_parameter_set if
@@ -66,6 +69,16 @@ lkd_var = ["LKD",
            "D-L-K",
            ]
 
+# a list of variations for Storage
+cbd_var = ["Cupboard",
+           "Utility Cupboard",
+           "Cb'd",
+           "Cp'd",
+           "Utility",
+           "Util"
+           ]
+
+
 
 
 # check there's a Unit Type parameter
@@ -99,6 +112,7 @@ if not chosen_room_param1:
 #form = FlexForm("Select Parameter", components)
 #form.show()
 #selected_parameter = form.values["room_tx_params"]
+counter = 0
 
 if selected_parameter:
     with revit.Transaction("Write Parameter", revit.doc):
@@ -112,6 +126,9 @@ if selected_parameter:
             # check if Living/Kitchen/Dining is written differently
             if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
                 room_name = "Living / Dining / Kitchen"
+            # check if Storage is written differently
+            if room_name.split()[0] in cbd_var:
+                room_name = "Storage"
             #format unit type
             if "1B1P" in unit_type or "1B 1P" in unit_type:
                 unit_type = "1B1P"
@@ -132,8 +149,12 @@ if selected_parameter:
             try:
                 get_req = area_dict[unit_type][room_name]
                 area_req.Set(convert_to_internal(get_req))
+                counter +=1
             except:
                 area_req.Set(0)
 
 
-
+forms.alert(msg="", \
+        sub_msg="Minimal Area Requirement parameter set for {} rooms".format(counter), \
+        ok=True, \
+        warn_icon=False)
