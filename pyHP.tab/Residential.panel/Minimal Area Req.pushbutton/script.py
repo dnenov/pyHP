@@ -137,7 +137,7 @@ if selected_parameter:
                 room_name = "STORAGE"
             if "BEDROOM" in room_name:
                 room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
-                print (room_name)
+
             #format unit type
             if "1B1P" in unit_type or "1B 1P" in unit_type:
                 unit_type = "1B1P"
@@ -161,7 +161,7 @@ if selected_parameter:
                 counter +=1
             except:
                 area_req.Set(0)
-                print (room_name)
+
 
 
 forms.alert(msg="", \
