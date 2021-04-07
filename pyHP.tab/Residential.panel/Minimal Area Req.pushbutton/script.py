@@ -6,6 +6,12 @@ import xlrd
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import sys
 
+def first_digit_str(some_str):
+
+    for ch in some_str:
+        if ch.isdigit() and ch!=str(0):
+            return ch
+
 def convert_to_internal(from_units):
     # convert project units to internal
     d_units = DB.Document.GetUnits(revit.doc).GetFormatOptions(DB.UnitType.UT_Area).DisplayUnits
@@ -70,15 +76,14 @@ lkd_var = ["LKD",
            ]
 
 # a list of variations for Storage
-cbd_var = ["Cupboard",
-           "Utility Cupboard",
-           "Cb'd",
-           "Cp'd",
-           "Utility",
-           "Util"
+cbd_var = ["CUPBOARD",
+           "UTILITY CUPBOARD",
+           "CB'D",
+           "CP'D",
+           "UTILITY",
+           "UTIL",
+           "STORAGE"
            ]
-
-
 
 
 # check there's a Unit Type parameter
@@ -107,7 +112,6 @@ if not chosen_room_param1:
     sys.exit()
 
 
-
 #components = [Label("Select room parameter to populate"), ComboBox("room_tx_params", room_params), Button ("Select")]
 #form = FlexForm("Select Parameter", components)
 #form.show()
@@ -122,13 +126,18 @@ if selected_parameter:
             unit_type = room.LookupParameter(chosen_room_param1).AsString()
             if not unit_type:
                 unit_type = "Blank"
-            room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString()
+            unit_type = unit_type.upper()
+            room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString().upper()
+
             # check if Living/Kitchen/Dining is written differently
             if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
-                room_name = "Living / Dining / Kitchen"
+                room_name = "LIVING / DINING / KITCHEN"
             # check if Storage is written differently
             if room_name.split()[0] in cbd_var:
-                room_name = "Storage"
+                room_name = "STORAGE"
+            if "BEDROOM" in room_name:
+                room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
+                print (room_name)
             #format unit type
             if "1B1P" in unit_type or "1B 1P" in unit_type:
                 unit_type = "1B1P"
@@ -152,6 +161,7 @@ if selected_parameter:
                 counter +=1
             except:
                 area_req.Set(0)
+                print (room_name)
 
 
 forms.alert(msg="", \
