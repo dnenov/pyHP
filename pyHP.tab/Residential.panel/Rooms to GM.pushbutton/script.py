@@ -9,6 +9,17 @@ from pyrevit.revit.db import query
 
 logger = script.get_logger()
 
+# get shared parameter for the extrusion material
+
+
+sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", DB.ParameterType.Material)
+if not sp_unit_material:
+    forms.alert(msg="No suitable parameter", \
+        sub_msg="There is no suitable parameter to use for Unit Material. Please add a shared parameter 'Unit Material' of Material Type", \
+        ok=True, \
+        warn_icon=True, exitscript=True)
+
+
 # use preselected elements, filtering rooms only
 pre_selection = helper.preselection_with_filter("Rooms")
 # or select rooms
@@ -31,20 +42,33 @@ if selection:
     # collect and organize Generic Model parameters: (only editable text type params)
     gm_parameter_set = helper.param_set_by_cat(DB.BuiltInCategory.OST_GenericModel)
     gm_params_text = [p for p in gm_parameter_set if p.StorageType.ToString() == "String"]
-    gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
+    gm_params_area = [p for p in gm_parameter_set if p.Definition.ParameterType.ToString()=="Area"]
 
+    if not gm_params_area:
+        forms.alert(msg="No suitable parameter", \
+                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit Area' of Area Type", \
+                    ok=True, \
+                    warn_icon=True, exitscript=True)
+
+    gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
+    gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
     # construct rwp UI
     components = [
         Label("[Department] Match Room parameters:"),
         ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
-        Label("[Department] to Generic Model parameters:"),
+        Label("[Description] to Generic Model parameters:"),
         ComboBox("gm_combobox1", gm_dict1, default="Description"),
+        Label("[Unit Area] parameter:"),
+        ComboBox("gm_combobox2", gm_dict2),
         Button("Select")]
     form = FlexForm("Match parameters", components)
     form.show()
     # assign chosen parameters
     chosen_room_param1 = form.values["room_combobox1"]
     chosen_gm_param1 = form.values["gm_combobox1"]
+    chosen_gm_param2 = form.values["gm_combobox2"]
+
+
 
     # iterate through rooms
     for room in selection:
@@ -54,7 +78,13 @@ if selection:
         room_boundaries = helper.room_bound_to_origin(room, geo_translation)
 
         # define new family doc
-        new_family_doc = revit.doc.Application.NewFamilyDocument(fam_template_path)
+        try:
+            new_family_doc = revit.doc.Application.NewFamilyDocument(fam_template_path)
+        except:
+            forms.alert(msg="No Template", \
+                        sub_msg="There is no Generic Model Template", \
+                        ok=True, \
+                        warn_icon=True, exitscript=True)
         # Name the Family ( Proj_Ten_Type_Name : Ten_Type)
         # get values of selected Room parameters and replace with default values if empty:
         # Project Number:
@@ -70,6 +100,9 @@ if selection:
         #       print (room_name)
         # except:
         #   room_name = str(room.Id)
+
+        # Room area:
+        unit_area = room.get_Parameter(DB.BuiltInParameter.ROOM_AREA).AsDouble()
 
         # Room number (to be used as layout type differentiation)
         room_number = room.get_Parameter(DB.BuiltInParameter.ROOM_NUMBER).AsString()
@@ -104,11 +137,19 @@ if selection:
         # Create extrusion from room boundaries
         with revit.Transaction(doc=new_family_doc, name="Create Extrusion"):
             try:
-                extrusion_height = helper.convert_to_internal(2500)
+                extrusion_height = helper.convert_length_to_internal(2500)
                 ref_plane = helper.get_ref_lvl_plane(new_family_doc)
                 # create extrusion, assign material, associate with shared parameter
                 extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
                                                                          extrusion_height)
+                ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+                try:
+                    new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
+                    DB.BuiltInParameterGroup.PG_MATERIALS, False)
+                    new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
+                except Exception as err:
+                    logger.error(err)
+
             except Exception as err:
                 logger.error(err)
 
@@ -134,6 +175,7 @@ if selection:
                         fam_symbol.Name = fam_type_name
                         # set type parameters
                         fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
+                        fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(unit_area)
                         if not fam_symbol.IsActive:
                             fam_symbol.Activate()
                             revit.doc.Regenerate()

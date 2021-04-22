@@ -130,10 +130,12 @@ if selected_parameter:
             room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString().upper()
 
             # check if Living/Kitchen/Dining is written differently
-            if room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
-                room_name = "LIVING / DINING / KITCHEN"
+
+            if room_name and room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
+                    room_name = "LIVING / DINING / KITCHEN"
+
             # check if Storage is written differently
-            if room_name.split()[0] in cbd_var:
+            if room_name and room_name.split()[0] in cbd_var:
                 room_name = "STORAGE"
             if "BEDROOM" in room_name:
                 room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
@@ -158,6 +160,7 @@ if selected_parameter:
             try:
                 get_req = area_dict[unit_type][room_name]
                 area_req.Set(convert_to_internal(get_req))
+
                 counter +=1
             except:
                 area_req.Set(0)

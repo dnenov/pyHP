@@ -39,8 +39,8 @@ def select_rooms_filter():
     except Exceptions.OperationCanceledException:
         forms.alert("Cancelled", ok=True, warn_icon=False)
 
-def convert_to_internal(from_units):
-    # convert project units to internal
+def convert_length_to_internal(from_units):
+    # convert length units from project  to internal
     d_units = DB.Document.GetUnits(revit.doc).GetFormatOptions(DB.UnitType.UT_Length).DisplayUnits
     converted = DB.UnitUtils.ConvertToInternalUnits(from_units, d_units)
     return converted
@@ -134,3 +134,5 @@ def get_family_slow_way(name):
             el_f_name = el.get_Parameter(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM).AsString()
             if el_f_name.strip(" ") == name:
                 return el
+
+
