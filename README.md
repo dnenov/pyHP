@@ -14,7 +14,7 @@ To make use of this extension, you will need to install [pyRevit](https://github
 
 
 
-After it's done, open this file <a href="https://raw.githubusercontent.com/dnenov/pyHP/master/extensions/extensions.json"  target="_blank" title="extensions"/> Extensions.json </a> and save it (Ctrl + S in your browser). Save the extensions file in this location, replacing the existing file:
+After it's done, open the <a href="https://raw.githubusercontent.com/dnenov/pyHP/master/extensions/extensions.json" target="_blank" rel="noopener noreferrer"/> Extensions.json </a> file and save it (Ctrl + S in your browser). Save the Extensions file in this location, replacing the existing file:
 
 
 C:\Users\ ~~**USERNAME**~~\AppData\Roaming\pyRevit-Master\extensions
