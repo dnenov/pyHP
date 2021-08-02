@@ -11,7 +11,12 @@ pyHP is a collection of tools created by [Archilizer](https://www.archilizer.com
 To make use of this extension, you will need to install [pyRevit](https://github.com/eirannejad/pyRevit/releases) first. 
 
 ### Step 1
-After it's done, copy the [extensions.json](https://github.com/dnenov/pyHP/blob/master/extensions/extensions.json) file to this folder, replacing the existing file:
+
+
+
+After it's done, copy the <a href="https://github.com/dnenov/pyHP/blob/master/extensions/extensions.json" title="extensions"/> Extensions.json </a>
+ file to this folder, replacing the existing file:
+
 
 C:\Users\ ~~**USERNAME**~~\AppData\Roaming\pyRevit-Master\extensions
 
