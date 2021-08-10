@@ -10,9 +10,12 @@ import sys
 
 
 def first_digit_str(some_str):
-    for ch in some_str:
+    """find the digit in a name, not equal to zero"""
+
+    for ch in str(some_str):
         if ch.isdigit() and ch != str(0):
             return ch
+
 
 
 def convert_to_internal(from_units):
@@ -32,6 +35,8 @@ def count_grouped(els):
     grouped_els = [el for el in els if not el.GroupId == DB.ElementId.InvalidElementId]
     return len(grouped_els)
 
+
+logger = script.get_logger()
 
 # Collect all rooms in model
 coll_rooms = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Rooms).ToElements()
@@ -147,50 +152,57 @@ counter = 0
 
 if selected_parameter:
     with revit.Transaction("Write Parameter", revit.doc):
-        for room in good_rooms:
-            # get room parameters
-            area_req = room.LookupParameter(selected_parameter)
-            unit_type = room.LookupParameter(chosen_room_param1).AsString()
-            if not unit_type:
-                unit_type = "Blank"
-            unit_type = unit_type.upper()
-            room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString().upper()
+            for room in good_rooms:
 
-            # check if Living/Kitchen/Dining is written differently
+                # get room parameters
+                area_req = room.LookupParameter(selected_parameter)
+                unit_type = room.LookupParameter(chosen_room_param1).AsString()
+                if not unit_type:
+                    unit_type = "Blank"
+                unit_type = unit_type.upper()
+                room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString().upper()
+                if room_name is not None:
+                    # check if Living/Kitchen/Dining is written differently
 
-            if room_name and room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
-                room_name = "LIVING / DINING / KITCHEN"
+                    if room_name and room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
+                        room_name = "LIVING / DINING / KITCHEN"
 
-            # check if Storage is written differently
-            if room_name and room_name.split()[0] in cbd_var:
-                room_name = "STORAGE"
-            if "BEDROOM" in room_name:
-                room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
 
-            # format unit type
-            if "1B1P" in unit_type or "1B 1P" in unit_type:
-                unit_type = "1B1P"
-            elif "1B2P" in unit_type or "1B 2P" in unit_type:
-                unit_type = "1B2P"
-            elif "2B3P" in unit_type or "2B 3P" in unit_type:
-                unit_type = "2B3P"
-            elif "2B4P" in unit_type or "2B 4P" in unit_type:
-                unit_type = "2B4P"
-            elif "3B5P" in unit_type or "3B 5P" in unit_type:
-                unit_type = "3B5P"
-            elif "3B6P" in unit_type or "3B 6P" in unit_type:
-                unit_type = "3B6P"
-            elif "4B6P" in unit_type or "4B 6P" in unit_type:
-                unit_type = "4B6P"
 
-            # look for room in dictionary and set Area Requirement value
-            try:
-                get_req = area_dict[unit_type][room_name]
-                area_req.Set(convert_to_internal(get_req))
 
-                counter += 1
-            except:
-                area_req.Set(0)
+                    # check if Storage is written differently
+                    if room_name and room_name.split()[0] in cbd_var:
+                        room_name = "STORAGE"
+                    if "BEDROOM" in room_name and first_digit_str(room_name):
+                        room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
+                    elif "BEDROOM" in room_name:
+                        room_name = "BEDROOM"
+                    # format unit type
+                    if "1B1P" in unit_type or "1B 1P" in unit_type:
+                        unit_type = "1B1P"
+                    elif "1B2P" in unit_type or "1B 2P" in unit_type:
+                        unit_type = "1B2P"
+                    elif "2B3P" in unit_type or "2B 3P" in unit_type:
+                        unit_type = "2B3P"
+                    elif "2B4P" in unit_type or "2B 4P" in unit_type:
+                        unit_type = "2B4P"
+                    elif "3B5P" in unit_type or "3B 5P" in unit_type:
+                        unit_type = "3B5P"
+                    elif "3B6P" in unit_type or "3B 6P" in unit_type:
+                        unit_type = "3B6P"
+                    elif "4B6P" in unit_type or "4B 6P" in unit_type:
+                        unit_type = "4B6P"
+
+                    # look for room in dictionary and set Area Requirement value
+                    try:
+                        get_req = area_dict[unit_type][room_name]
+                        area_req.Set(convert_to_internal(get_req))
+
+                        counter += 1
+                    except:
+                        area_req.Set(0)
+
+
 
 forms.alert(msg="Minimal Area Requirement parameter set for {} rooms".format(counter), \
             sub_msg="{} Rooms discarded from operation (Rooms in Groups).".format(discarded_rooms), \
