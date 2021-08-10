@@ -1,4 +1,4 @@
-__title__ = "Remove Unused Scope Boxes"
+__title__ = "Purge Unused Scope Boxes"
 
 
 from pyrevit import revit, DB, forms, script
