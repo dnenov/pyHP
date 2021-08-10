@@ -1,16 +1,19 @@
 __title__ = "Min area"
-__doc__ = "Fill in minimal area requirement based on a formatted excel file. This script fill in the value of Minimal Area Requirement based on Room Name (ex. Bedroom) and Unit Type. Please make sure these parameters "
+__doc__ = "Fill in minimal area requirement based on a formatted excel file. This script fill in the value of Minimal \
+ Area Requirement based on Room Name (ex. Bedroom) and Unit Type. Please make sure these parameters are filled in. \
+  Does not work for Rooms in Groups"
 
 from pyrevit import revit, DB, forms
 import xlrd
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import sys
 
-def first_digit_str(some_str):
 
+def first_digit_str(some_str):
     for ch in some_str:
-        if ch.isdigit() and ch!=str(0):
+        if ch.isdigit() and ch != str(0):
             return ch
+
 
 def convert_to_internal(from_units):
     # convert project units to internal
@@ -18,40 +21,59 @@ def convert_to_internal(from_units):
     converted = DB.UnitUtils.ConvertToInternalUnits(from_units, d_units)
     return converted
 
+
+def discard_grouped(elements):
+    return [el for el in elements if el.GroupId == DB.ElementId.InvalidElementId and not isinstance(el, DB.Group)]
+
+
+def count_grouped(els):
+    # count how many grouped elements in list
+    grouped_els = [el for el in els if not el.GroupId == DB.ElementId.InvalidElementId]
+    return len(grouped_els)
+
+
+# Collect all rooms in model
 coll_rooms = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Rooms).ToElements()
 
-# take only placed rooms
-good_rooms = [r for r in coll_rooms if r.Area != 0]
+# take only placed and enclosed rooms
+enclosed_rooms = [r for r in coll_rooms if r.Area != 0]
 
-if not good_rooms:
-    forms.alert(msg="No rooms", sub_msg = "There are no placed rooms in model", ok=True, warn_icon=True, exitscript=True)
+if not enclosed_rooms:
+    forms.alert(msg="No rooms", sub_msg="There are no enclosed rooms in model", ok=True, warn_icon=True,
+                exitscript=True)
 
+# discard rooms in groups (not editable outside group edit mode). Count discarded rooms
+discarded_rooms = count_grouped(enclosed_rooms)
+good_rooms = discard_grouped(enclosed_rooms)
+
+# query all available room parameters
 element_parameter_set = good_rooms[0].Parameters
 
+# pick which parameters to use
+## prepare parameters for UI
 room_params = [p.Definition.Name for p in element_parameter_set if
-               p.StorageType.ToString() == "Double" and p.IsReadOnly == False and p.Definition.Name not in ["Limit Offset", "Base Offset"]]
+               p.StorageType.ToString() == "Double" and p.IsReadOnly == False and p.Definition.Name not in [
+                   "Limit Offset", "Base Offset"]]
 
 if not room_params:
-    forms.alert(msg="No suitable parameter", \
-        sub_msg="There is no suitable parameter to use for Minimal Area Requirement. Please add a parameter 'Area Requirement' of Area Type", \
-        ok=True, \
-        warn_icon=True, exitscript=True)
-
+    forms.alert(msg="No suitable parameter",
+                sub_msg="There is no suitable parameter to use for Minimal Area Requirement. Please add a parameter 'Area Requirement' of Area Type",
+                ok=True,
+                warn_icon=True, exitscript=True)
 
 # pick excel file and read
-path = forms.pick_file(file_ext='xlsx',init_dir="M:\BIM\BIM Manual\Minimal area requirement table")
+path = forms.pick_file(file_ext='xlsx', init_dir="M:\BIM\BIM Manual\Minimal area requirement table")
 book = xlrd.open_workbook(path)
 worksheet = book.sheet_by_index(0)
 
-# create dictionary with min requirements, of format [unit type][room name] : min area
+# from the excel file, create dictionary with min requirements, of format [unit type][room name] : min area
 area_dict = {}
 for i in range(1, worksheet.ncols):
     area_dict[worksheet.cell_value(0, i)] = {}
     for j in range(1, worksheet.nrows):
         area_dict[worksheet.cell_value(0, i)][worksheet.cell_value(j, 0)] = worksheet.cell_value(j, i)
 
-
-# a list of variations for Living / Dining / Kitchen room name
+## a list of variations for Living / Dining / Kitchen room name
 lkd_var = ["LKD",
            "LDK",
            "KLD",
@@ -75,7 +97,7 @@ lkd_var = ["LKD",
            "D-L-K",
            ]
 
-# a list of variations for Storage
+## a list of variations for Storage
 cbd_var = ["CUPBOARD",
            "UTILITY CUPBOARD",
            "CB'D",
@@ -85,16 +107,17 @@ cbd_var = ["CUPBOARD",
            "STORAGE"
            ]
 
-
 # check there's a Unit Type parameter
 # gather and organize Room parameters: (only editable text params)
 room_parameter_set = good_rooms[0].Parameters
 room_params_text = [p.Definition.Name for p in room_parameter_set if
-                        p.StorageType.ToString() == "String" and p.IsReadOnly == False]
+                    p.StorageType.ToString() == "String" and p.IsReadOnly == False]
+
+# forms.select_parameters(src_element=good_rooms[0], multiple = False, include_instance = True, include_type = False)
 
 
-#forms.select_parameters(src_element=good_rooms[0], multiple = False, include_instance = True, include_type = False)
 room_params.sort()
+
 # construct rwp UI
 components = [
     Label("Which Room parameter is used for Unit Type:"),
@@ -111,11 +134,6 @@ selected_parameter = form.values["area_req_param"]
 if not chosen_room_param1:
     sys.exit()
 
-
-#components = [Label("Select room parameter to populate"), ComboBox("room_tx_params", room_params), Button ("Select")]
-#form = FlexForm("Select Parameter", components)
-#form.show()
-#selected_parameter = form.values["room_tx_params"]
 counter = 0
 
 if selected_parameter:
@@ -132,7 +150,7 @@ if selected_parameter:
             # check if Living/Kitchen/Dining is written differently
 
             if room_name and room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
-                    room_name = "LIVING / DINING / KITCHEN"
+                room_name = "LIVING / DINING / KITCHEN"
 
             # check if Storage is written differently
             if room_name and room_name.split()[0] in cbd_var:
@@ -140,10 +158,10 @@ if selected_parameter:
             if "BEDROOM" in room_name:
                 room_name = " ".join(["BEDROOM", first_digit_str(room_name)])
 
-            #format unit type
+            # format unit type
             if "1B1P" in unit_type or "1B 1P" in unit_type:
                 unit_type = "1B1P"
-            elif "1B2P" in unit_type or "1B 2P" in unit_type :
+            elif "1B2P" in unit_type or "1B 2P" in unit_type:
                 unit_type = "1B2P"
             elif "2B3P" in unit_type or "2B 3P" in unit_type:
                 unit_type = "2B3P"
@@ -161,13 +179,11 @@ if selected_parameter:
                 get_req = area_dict[unit_type][room_name]
                 area_req.Set(convert_to_internal(get_req))
 
-                counter +=1
+                counter += 1
             except:
                 area_req.Set(0)
 
-
-
-forms.alert(msg="", \
-        sub_msg="Minimal Area Requirement parameter set for {} rooms".format(counter), \
-        ok=True, \
-        warn_icon=False)
+forms.alert(msg="Minimal Area Requirement parameter set for {} rooms".format(counter), \
+            sub_msg="{} rooms discarded (Rooms in Groups).".format(discarded_rooms), \
+            ok=True, \
+            warn_icon=False)
