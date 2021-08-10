@@ -3,7 +3,7 @@ __doc__ = "Fill in minimal area requirement based on a formatted excel file. Thi
  Area Requirement based on Room Name (ex. Bedroom) and Unit Type. Please make sure these parameters are filled in. \
   Does not work for Rooms in Groups"
 
-from pyrevit import revit, DB, forms
+from pyrevit import revit, DB, forms, script
 import xlrd
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import sys
@@ -16,13 +16,14 @@ def first_digit_str(some_str):
 
 
 def convert_to_internal(from_units):
-    # convert project units to internal
+    """convert project units to internal"""
     d_units = DB.Document.GetUnits(revit.doc).GetFormatOptions(DB.UnitType.UT_Area).DisplayUnits
     converted = DB.UnitUtils.ConvertToInternalUnits(from_units, d_units)
     return converted
 
 
 def discard_grouped(elements):
+    """discard grouped elements"""
     return [el for el in elements if el.GroupId == DB.ElementId.InvalidElementId and not isinstance(el, DB.Group)]
 
 
@@ -62,7 +63,15 @@ if not room_params:
                 warn_icon=True, exitscript=True)
 
 # pick excel file and read
-path = forms.pick_file(file_ext='xlsx', init_dir="M:\BIM\BIM Manual\Minimal area requirement table")
+with forms.WarningBar(title="Pick excel file with Area Requirements"):
+    path = forms.pick_file(file_ext='xlsx', init_dir="M:\BIM\BIM Manual\Minimal area requirement table")
+
+if not path:
+    forms.alert(msg="No file selected",
+                sub_msg="No excel file with area requirements selected.",
+                ok=True,
+                warn_icon=True, exitscript=True)
+
 book = xlrd.open_workbook(path)
 worksheet = book.sheet_by_index(0)
 
@@ -184,6 +193,6 @@ if selected_parameter:
                 area_req.Set(0)
 
 forms.alert(msg="Minimal Area Requirement parameter set for {} rooms".format(counter), \
-            sub_msg="{} rooms discarded (Rooms in Groups).".format(discarded_rooms), \
+            sub_msg="{} Rooms discarded from operation (Rooms in Groups).".format(discarded_rooms), \
             ok=True, \
             warn_icon=False)

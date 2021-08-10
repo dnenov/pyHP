@@ -45,9 +45,9 @@ if selection:
     gm_params_area = [p for p in gm_parameter_set if p.Definition.ParameterType.ToString()=="Area"]
 
     if not gm_params_area:
-        forms.alert(msg="No suitable parameter", \
-                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit Area' of Area Type", \
-                    ok=True, \
+        forms.alert(msg="No suitable parameter",
+                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit Area' of Area Type",
+                    ok=True,
                     warn_icon=True, exitscript=True)
 
     gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
@@ -81,9 +81,9 @@ if selection:
         try:
             new_family_doc = revit.doc.Application.NewFamilyDocument(fam_template_path)
         except:
-            forms.alert(msg="No Template", \
-                        sub_msg="There is no Generic Model Template", \
-                        ok=True, \
+            forms.alert(msg="No Template",
+                        sub_msg="There is no Generic Model Template",
+                        ok=True,
                         warn_icon=True, exitscript=True)
         # Name the Family ( Proj_Ten_Type_Name : Ten_Type)
         # get values of selected Room parameters and replace with default values if empty:
