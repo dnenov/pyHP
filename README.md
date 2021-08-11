@@ -19,6 +19,7 @@ Go to the [pyRevit Releases](https://github.com/eirannejad/pyRevit/releases) pag
 
 Install pyRevit in this folder: 
 
+C:\Users\  ~~**USERNAME**~~\AppData\Roaming\pyRevit-Master
 
 <img src="/images/How-to-1.2.png" alt="How-to-step-1.2" height="40%" width="40%">
 
