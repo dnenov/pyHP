@@ -163,13 +163,8 @@ if selected_parameter:
                 room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString().upper()
                 if room_name is not None:
                     # check if Living/Kitchen/Dining is written differently
-
                     if room_name and room_name.split()[0] in lkd_var or room_name.split("/")[0] in lkd_var:
                         room_name = "LIVING / DINING / KITCHEN"
-
-
-
-
                     # check if Storage is written differently
                     if room_name and room_name.split()[0] in cbd_var:
                         room_name = "STORAGE"

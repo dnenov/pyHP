@@ -50,13 +50,17 @@ def get_shared_param_by_name_type(sp_name, sp_type):
     # query shared parameters file and return the desired parameter by name and parameter type
     # will return first result
     spf = revit.doc.Application.OpenSharedParameterFile()
-    for def_group in spf.Groups:
-        for sp in def_group.Definitions:
-            if sp.Name == sp_name and sp.ParameterType == sp_type:
-                return sp
-    if not sp:
-        forms.alert("Shared parameter not found", ok=True, warn_icon=True)
-
+    try:
+        for def_group in spf.Groups:
+            for sp in def_group.Definitions:
+                if sp.Name == sp_name and sp.ParameterType == sp_type:
+                    return sp
+        if not sp:
+            forms.alert("Shared parameter not found", ok=True, warn_icon=True)
+            return None
+    except:
+        forms.alert("Shared parameter not found", ok=True, warn_icon=True )
+        return None
 
 def param_set_by_cat(cat):
     # get all project type parameters of a given category
