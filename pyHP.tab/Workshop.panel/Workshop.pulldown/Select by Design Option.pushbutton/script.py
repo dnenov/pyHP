@@ -7,9 +7,15 @@ from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import sys
 
 
+def get_full_option_name(design_option):
+    do_set = design_option.get_Parameter(DB.BuiltInParameter.DESIGN_OPTION_PARAM).AsString()
+    do_name = design_option.Name
+    do_full_name = " : ".join([do_set, do_name])
+    return do_full_name
+
 design_options = DB.FilteredElementCollector(revit.doc).OfClass(DB.DesignOption).ToElements()
 
-do_dict = {do.Name: do for do in design_options}
+do_dict = {get_full_option_name(do) : do for do in design_options}
 
 # construct rwp UI
 components = [
