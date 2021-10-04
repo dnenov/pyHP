@@ -19,6 +19,41 @@ if not sp_unit_material:
         ok=True, \
         warn_icon=True, exitscript=True)
 
+inst_param_list = [
+    "Core Nr",
+    "Flat Orientation"
+]
+
+type_param_list = [
+    "Tenure",
+    "Unit Type",
+    "Unit Area"
+]
+
+not_found = []
+any_gm_inst = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_GenericModel).WhereElementIsNotElementType().FirstElement()
+any_gm_type = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_GenericModel).WhereElementIsElementType().FirstElement()
+for par in inst_param_list:
+    exists = None
+    el_param_set = any_gm_inst.Parameters
+    for p in el_param_set:
+
+        if p.Definition.Name == par:
+            exists = True
+    if not exists:
+        not_found.append(par)
+
+for par in type_param_list:
+    exists = None
+    el_param_set = any_gm_type.Parameters
+    for p in el_param_set:
+        if p.Definition.Name == par:
+            exists = True
+    if not exists:
+        not_found.append(par)
+
+if not_found:
+    forms.alert("Parameters not found. Please add Shared Parameters: \n\n{}".format("\n".join(not_found)), warn_icon=True, exitscript=True)
 
 # use preselected elements, filtering rooms only
 pre_selection = helper.preselection_with_filter("Rooms")
@@ -33,44 +68,6 @@ if selection:
     # get file template from location
     fam_template_path = "C:\ProgramData\Autodesk\RVT " + \
                         HOST_APP.version + "\Family Templates\English\Metric Generic Model.rft"
-
-    # format parameters for UI
-    # gather and organize Room parameters: (only editable text params)
-#    room_parameter_set = selection[0].Parameters
- #   room_params_text = [p.Definition.Name for p in room_parameter_set if
-#                        p.StorageType.ToString() == "String" and p.IsReadOnly == False]
-    # collect and organize Generic Model parameters: (only editable text type params)
-#    gm_parameter_set = helper.param_set_by_cat(DB.BuiltInCategory.OST_GenericModel)
-#    gm_params_text = [p for p in gm_parameter_set if p.StorageType.ToString() == "String"]
-#    gm_params_area = [p for p in gm_parameter_set if p.Definition.ParameterType.ToString()=="Area"]
-
-
-#    if not gm_params_area:
-#        forms.alert(msg="No suitable parameter",
-#                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit Area' of Area Type",
-#                    ok=True,
- #                   warn_icon=True, exitscript=True)
-
-    #gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
-    #gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
-    # construct rwp UI
-    #components = [
-    #    Label("[Department] Match Room parameters:"),
-    #    ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
-    #    Label("[Description] to Generic Model parameters:"),
-    #    ComboBox("gm_combobox1", gm_dict1, default="Description"),
-    #    Label("[Unit Area] parameter:"),
-    #    ComboBox("gm_combobox2", gm_dict2),
-    #    Button("Select")]
-    #form = FlexForm("Match parameters", components)
-    #form.show()
-
-    # assign chosen parameters
-#    chosen_room_param1 = form.values["room_combobox1"]
-#    chosen_gm_param1 = form.values["gm_combobox1"]
-#    chosen_gm_param2 = form.values["gm_combobox2"]
-
-
 
     # iterate through rooms
     for room in selection:
@@ -116,35 +113,44 @@ if selection:
         # Unit Type:
         if "1B1P" in room_name:
             unit_type = "1B1P"
+            dept = "Flat"
         elif "1B2P(A)" in room_name or "1B2P (A)" in room_name:
             unit_type = "1B2P(A)"
+            dept = "Flat"
         elif "1B2P" in room_name:
             unit_type = "1B2P"
+            dept = "Flat"
         elif "2B3P(A)" in room_name or "2B3P (A)" in room_name:
             unit_type = "2B3P(A)"
+            dept = "Flat"
         elif "2B3P" in room_name:
             unit_type = "2B3P"
+            dept = "Flat"
         elif "2B4P(A)" in room_name or "2B4P (A)" in room_name:
             unit_type = "2B4P(A)"
+            dept = "Flat"
         elif "2B4P" in room_name:
             unit_type = "2B4P"
+            dept = "Flat"
         elif "3B5P(D)"in room_name or "3B5P (D)" in room_name:
             unit_type = "3B5P(D)"
+            dept = "Flat"
         elif "3B5P" in room_name:
             unit_type = "3B5P"
+            dept = "Flat"
         elif "4B6P(D)"in room_name or "4B6P (D)" in room_name:
             unit_type = "4B6P(D)"
+            dept = "Flat"
         elif "3B6P" in room_name:
             unit_type = "3B6P"
+            dept = "Flat"
         elif "4B6P" in room_name:
             unit_type = "4B6P"
+            dept = "Flat"
 
         else:
             unit_type = ""
 
-        # get Core Nr
-        core_nr = room.LookupParameter("Core Nr").AsString()
-        flat_orientation = room.LookupParameter("Flat Orientation").AsString()
 
         # Room area:
         unit_area = room.get_Parameter(DB.BuiltInParameter.ROOM_AREA).AsDouble()
@@ -225,20 +231,33 @@ if selection:
                             fam_symbol.Activate()
                             revit.doc.Regenerate()
 
-                        # set tenure
-                        fam_symbol.LookupParameter("Tenure").Set(tenure_code)
-                        # set unit type
-                        fam_symbol.LookupParameter("Unit Type").Set(unit_type)
-
-                        # place family symbol at postision
+                        try:
+                            # set tenure
+                            fam_symbol.LookupParameter("Tenure").Set(tenure_code)
+                        except:
+                            pass
+                        try:
+                            # set unit type
+                            fam_symbol.LookupParameter("Unit Type").Set(unit_type)
+                        except:
+                            pass
+                        # place family symbol at position
                         new_fam_instance = revit.doc.Create.NewFamilyInstance(room.Location.Point, fam_symbol, room.Level,
                                                                               str_type)
+
                         correct_lvl_offset = new_fam_instance.get_Parameter(
                             DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
 
                         # set instance parameters
+                        # get Core Nr
+
+                        core_nr = room.LookupParameter("Core Nr").AsString()
+                        flat_orientation = room.LookupParameter("Flat Orientation").AsString()
                         new_fam_instance.LookupParameter("Core Nr").Set(core_nr)
                         new_fam_instance.LookupParameter("Flat Orientation").Set(flat_orientation)
+
+
+
 
            # except Exception as err:
                # logger.error(err)
