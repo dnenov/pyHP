@@ -1,24 +1,17 @@
-"""First attempt to create a colour legend from excel"""
+"""Draw Legend based on View Filters of a chosen view"""
 
-
-import itertools
+from pyrevit import revit, DB, UI, forms
 from collections import defaultdict
-from pyrevit.framework import List
-from pyrevit import HOST_APP
-from pyrevit import forms
-from pyrevit import revit, DB
-from pyrevit import script
-from pyrevit import revit, DB, forms, script
-import xlrd
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
-import sys
-from itertools import izip
 from collections import OrderedDict
+from pyrevit.framework import List
 
 
-def any_fill_type():
-    # get any Filled Region Type
-    return DB.FilteredElementCollector(revit.doc).OfClass(DB.FilledRegionType).FirstElement()
+def get_solid_fill_pat():
+    # get fill pattern element Solid Fill
+    fill_pats = DB.FilteredElementCollector(revit.doc).OfClass(DB.FillPatternElement)
+    solid_pat = [pat for pat in fill_pats if str(pat.Name) == "<Solid fill>"]
+    return solid_pat[0]
 
 
 def translate_rectg_vert (rec, vert_offset):
@@ -29,99 +22,60 @@ def translate_rectg_vert (rec, vert_offset):
     return [cv.CreateTransformed(transform) for cv in rec]
 
 
-def get_solid_fill_pat(doc=revit.doc):
-    # get fill pattern element Solid Fill
-    fill_pats = DB.FilteredElementCollector(doc).OfClass(DB.FillPatternElement)
-    solid_pat = [pat for pat in fill_pats if str(pat.Name) == "<Solid fill>"]
-    return solid_pat[0]
+def any_fill_type():
+    # get any Filled Region Type
+    return DB.FilteredElementCollector(revit.doc).OfClass(DB.FilledRegionType).FirstElement()
 
 
-def reformat_colour(col_sting):
-    # reformat strings representing colour and create elements of type DB.Color
-    new_col = col_sting.replace("-", " ")
-    rgb_str = new_col.split()
-    r = int(rgb_str[0])
-    g = int(rgb_str[1])
-    b = int(rgb_str[2])
-    return DB.Color(r,g,b)
+col_views = DB.FilteredElementCollector(revit.doc).OfClass(DB.View).WhereElementIsNotElementType()
 
+# TODO: Sort out views with no filters
+# prep options
+view_dict1 = {v.Name: v for v in col_views}
 
-def place_header_text (header_text, header_position, text_style):
-    header_note = DB.TextNote.Create(revit.doc, view.Id, header_position, header_text, text_style.Id)
-    return header_note
-
-
-def header_pos(crv_loop):
-    start_pt = crv_loop[0].GetEndPoint(0)
-    header_position = DB.XYZ(start_pt.X, start_pt.Y + h_offset, 0 )
-    return header_position
-
-
-def get_next_key(cur_key, dict):
-    next_key = None
-#    temp_dict = iter(colour_od.keys())
-    temp_dict = iter(dict.keys())
-    for key in temp_dict:
-        if key == cur_key:
-            next_key = next(temp_dict, None)
-    return next_key
-
-
-def draw_rectangle(y_offset, fill_type, view):
-    # draw a filled region of any type with a specified y offset
-    rectangle_outlines = translate_rectg_vert(orig_rectangle, y_offset)
-    crv_loop = DB.CurveLoop.Create(List[DB.Curve](rectangle_outlines))
-    new_reg = DB.FilledRegion.Create(revit.doc, fill_type.Id, view.Id, [crv_loop])
-    return new_reg
-
-
-view = revit.active_view
-
-# pick excel file and read
-with forms.WarningBar(title="Pick excel file with colour scheme"):
-    path = forms.pick_file(file_ext='xlsx', init_dir="M:\BIM\BIM Manual\Colour Scheme Table")
-
-book = xlrd.open_workbook(path)
-worksheet = book.sheet_by_index(0)
-
-def get_any_text_type_id():
-    # get a default text note type - to replace later
-    txt_type = revit.doc.GetElement(revit.doc.GetDefaultElementTypeId(DB.ElementTypeGroup.TextNoteType))
-    return txt_type.Id
-
-# create ordered dictionary
-colour_scheme_od = OrderedDict()
-for i in range(0, worksheet.nrows):
-    h1 = worksheet.cell_value(i,0)
-    comp = worksheet.cell_value(i, 1)
-    colour_raw = worksheet.cell_value(i, 2)
-    colour = reformat_colour(colour_raw)
-    if h1 not in colour_scheme_od.keys():
-        colour_scheme_od[h1] = OrderedDict()
-    colour_scheme_od[h1][comp] = colour
-
+# get all text styles to choose from
 txt_types = DB.FilteredElementCollector(revit.doc).OfClass(DB.TextNoteType)
-
-
 text_style_dict= {txt_t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString(): txt_t for txt_t in txt_types}
-#gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
+
 # construct rwp UI
 components = [
-    Label("Pick Text Style:"),
-    ComboBox(name="textstyle_combobox1", options=text_style_dict),
-    Button("Select")]
-form = FlexForm("Appearance", components)
+    Label("Pick Source View:"),
+    ComboBox(name="view_combobox", options=view_dict1),
+    Label("Pick Text Style"),
+    ComboBox(name="textstyle_combobox", options=text_style_dict),
+    Label("Pick Colour Source"),
+    ComboBox(name="coloursource_combobox", options=["Cut", "Projection"]),
+    Button("Select")
+]
+form = FlexForm("Select", components)
 form.show()
 # assign chosen parameters
-chosen_text_style = form.values["textstyle_combobox1"]
+src_view = form.values["view_combobox"]
+text_style = form.values["textstyle_combobox"]
+colour_source = form.values["coloursource_combobox"]
+
+legend_view = revit.active_view
+view_filters = src_view.GetFilters()
+
+legend_od = OrderedDict()
+
+for f in view_filters:
+
+    overrides = src_view.GetFilterOverrides(f)
+    if colour_source == "Projection":
+        filter_colour = overrides.SurfaceForegroundPatternColor
+    else:
+        filter_colour = overrides.CutForegroundPatternColor
+    filter_name = revit.doc.GetElement(f).Name
+    legend_od[filter_name] = filter_colour
+
 
 # dims and scale
-scale = 1
-w = 6.25 * scale
-h = 2.6 * scale
+scale = float(legend_view.Scale)/100
+w = 3.25 * scale
+h = 1.3 * scale
 text_offset = 1 * scale
-shift = 5 * scale
-h_offset = 10*scale
+shift = 2.32 * scale
 # create rectrangle
 crv_loop = DB.CurveLoop()
 
@@ -136,41 +90,32 @@ l2 = DB.Line.CreateBound(p2, p3)
 l3 = DB.Line.CreateBound(p3, p4)
 l4 = DB.Line.CreateBound(p4, p1)
 
-orig_rectangle = [l1, l2, l3, l4]
+rectangle = [l1, l2, l3, l4]
 
 offset = 0
-origin = DB.XYZ(0,shift,0)
+origin = DB.XYZ(0,0,0)
+
 
 with revit.Transaction("Draw Legend"):
-    for header in colour_scheme_od:
-        # place header for group of items
-        header_position = origin
-        header_text = place_header_text(header, header_position, chosen_text_style)
-        formatted = header_text.GetFormattedText()
-        formatted.SetBoldStatus(True)
-        header_text.SetFormattedText(formatted)
+    for v_filter in legend_od:
 
+        t1 = DB.Transform.CreateTranslation(DB.XYZ(0, -shift, 0))
+        rectangle = [line.CreateTransformed(t1) for line in rectangle]
+        crv_loop = DB.CurveLoop.Create(List[DB.Curve](rectangle))
 
-        offset += shift*0.75
-        origin = DB.XYZ(origin.X, -(offset), origin.Z)
-        for component in colour_scheme_od[header]:
-            # draw rectangles with filled region
-            new_reg = draw_rectangle(offset, any_fill_type(), view)
-            # override fill and colour
-            ogs = DB.OverrideGraphicSettings()
-            ogs.SetSurfaceForegroundPatternColor(colour_scheme_od[header][component])
-            ogs.SetSurfaceForegroundPatternId(get_solid_fill_pat().Id)
-            view.SetElementOverrides(new_reg.Id, ogs)
+        # draw rectangles with filled region
+        new_reg = DB.FilledRegion.Create(revit.doc, any_fill_type().Id, legend_view.Id, [crv_loop])
 
-            # place text next to filled regions
-            label_position = DB.XYZ(w+text_offset, -(offset-h), 0)
-            label_txt = str(component)
-            text_note = DB.TextNote.Create(revit.doc, view.Id, label_position, label_txt, chosen_text_style.Id)
+        # override fill and colour
+        ogs = DB.OverrideGraphicSettings()
+        colour = legend_od[v_filter]
+        ogs.SetSurfaceForegroundPatternColor(legend_od[v_filter])
+        ogs.SetSurfaceForegroundPatternId(get_solid_fill_pat().Id)
+        legend_view.SetElementOverrides(new_reg.Id, ogs)
 
-            # keep offsetting y
-            offset += shift
-        # offset again before starting a new group
-        origin = DB.XYZ(origin.X, -(offset), origin.Z)
-        offset += shift
-
+        # place text next to filled regions
+        t2 = DB.Transform.CreateTranslation(DB.XYZ(text_offset, 0, 0))
+        label_position = rectangle[1].CreateTransformed(t2).GetEndPoint(1)
+        label_txt = str(v_filter)
+        text_note = DB.TextNote.Create(revit.doc, legend_view.Id, label_position, label_txt, text_style.Id)
 
