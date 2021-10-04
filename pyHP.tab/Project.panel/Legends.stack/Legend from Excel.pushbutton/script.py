@@ -1,18 +1,8 @@
-"""First attempt to create a colour legend from excel"""
-
-
-import itertools
-from collections import defaultdict
+"""Create a colour legend from excel. Find a template in the folder."""
 from pyrevit.framework import List
-from pyrevit import HOST_APP
-from pyrevit import forms
-from pyrevit import revit, DB
-from pyrevit import script
 from pyrevit import revit, DB, forms, script
 import xlrd
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
-import sys
-from itertools import izip
 from collections import OrderedDict
 
 
@@ -100,11 +90,10 @@ for i in range(0, worksheet.nrows):
         colour_scheme_od[h1] = OrderedDict()
     colour_scheme_od[h1][comp] = colour
 
+# get all text styles to choose from
 txt_types = DB.FilteredElementCollector(revit.doc).OfClass(DB.TextNoteType)
-
-
 text_style_dict= {txt_t.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString(): txt_t for txt_t in txt_types}
-#gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
+
 # construct rwp UI
 components = [
     Label("Pick Text Style:"),
@@ -116,12 +105,12 @@ form.show()
 chosen_text_style = form.values["textstyle_combobox1"]
 
 # dims and scale
-scale = 1
-w = 6.25 * scale
-h = 2.6 * scale
+scale = float(view.Scale)/100
+w = 3.25 * scale
+h = 1.3 * scale
 text_offset = 1 * scale
-shift = 5 * scale
-h_offset = 10*scale
+shift = 2.32 * scale
+h_offset = 5.25 * scale
 # create rectrangle
 crv_loop = DB.CurveLoop()
 
@@ -149,7 +138,6 @@ with revit.Transaction("Draw Legend"):
         formatted = header_text.GetFormattedText()
         formatted.SetBoldStatus(True)
         header_text.SetFormattedText(formatted)
-
 
         offset += shift*0.75
         origin = DB.XYZ(origin.X, -(offset), origin.Z)
