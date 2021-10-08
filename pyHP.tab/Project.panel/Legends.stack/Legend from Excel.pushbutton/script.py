@@ -84,10 +84,6 @@ with forms.WarningBar(title="Pick excel file with colour scheme"):
 book = xlrd.open_workbook(path)
 worksheet = book.sheet_by_index(0)
 
-def get_any_text_type_id():
-    # get a default text note type - to replace later
-    txt_type = revit.doc.GetElement(revit.doc.GetDefaultElementTypeId(DB.ElementTypeGroup.TextNoteType))
-    return txt_type.Id
 
 # create ordered dictionary
 colour_scheme_od = OrderedDict()
@@ -140,10 +136,24 @@ orig_rectangle = [l1, l2, l3, l4]
 offset = 0
 origin = DB.XYZ(0,shift,0)
 
-
+# with revit.Transaction("Create Filled Reg"):
+#     fr_types = DB.FilteredElementCollector(revit.doc).OfClass(DB.FilledRegionType)
+#
+#     for tx_value in colour_scheme_od.keys():
+#         found = False
+#         for fr_type in fr_types:
+#             if fr_type.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString() == tx_value:
+#                 colour_scheme_od[tx_value] = fr_type
+#                 found = True
+#         if not found:
+#             new_type = any_fill_type().Duplicate(tx_value)
+#             new_type.ForegroundPatternColor = colour_scheme_od[header][tx_value]
+#             new_type.ForegroundPatternId  = get_solid_fill_pat().Id
+#             colour_scheme_od[tx_value] = new_type
 
 
 with revit.Transaction("Draw Legend"):
+    fr_types = DB.FilteredElementCollector(revit.doc).OfClass(DB.FilledRegionType)
     for header in colour_scheme_od:
         # place header for group of items
         header_position = origin
@@ -154,19 +164,32 @@ with revit.Transaction("Draw Legend"):
 
         offset += shift*0.75
         origin = DB.XYZ(origin.X, -(offset), origin.Z)
-        for component in colour_scheme_od[header]:
-            # draw rectangles with filled region
+        for fill_name in colour_scheme_od[header]:
 
-            new_reg = draw_rectangle(offset, any_fill_type(), view, invis_style())
-            # override fill and colour
-            ogs = DB.OverrideGraphicSettings()
-            ogs.SetSurfaceForegroundPatternColor(colour_scheme_od[header][component])
-            ogs.SetSurfaceForegroundPatternId(get_solid_fill_pat().Id)
-            view.SetElementOverrides(new_reg.Id, ogs)
+
+            found = False
+            for fr_type in fr_types:
+                if fr_type.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString() == fill_name:
+                    colour_scheme_od[header][fill_name] = fr_type
+                    found = True
+            if not found:
+                new_type = any_fill_type().Duplicate(fill_name)
+                new_type.ForegroundPatternColor = colour_scheme_od[header][fill_name]
+                new_type.ForegroundPatternId = get_solid_fill_pat().Id
+                colour_scheme_od[header][fill_name] = new_type
+
+
+            # draw rectangles with filled region
+            new_reg = draw_rectangle(offset, colour_scheme_od[header][fill_name], view, invis_style())
+            # # override fill and colour
+            # ogs = DB.OverrideGraphicSettings()
+            # ogs.SetSurfaceForegroundPatternColor(colour_scheme_od[header][component])
+            # ogs.SetSurfaceForegroundPatternId(get_solid_fill_pat().Id)
+            # view.SetElementOverrides(new_reg.Id, ogs)
 
             # place text next to filled regions
             label_position = DB.XYZ(w+text_offset, -(offset-h), 0)
-            label_txt = str(component)
+            label_txt = str(fill_name)
             text_note = DB.TextNote.Create(revit.doc, view.Id, label_position, label_txt, chosen_text_style.Id)
 
             # keep offsetting y
