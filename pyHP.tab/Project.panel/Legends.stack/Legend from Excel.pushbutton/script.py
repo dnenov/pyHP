@@ -57,12 +57,22 @@ def get_next_key(cur_key, dict):
     return next_key
 
 
-def draw_rectangle(y_offset, fill_type, view):
+def draw_rectangle(y_offset, fill_type, view, line_style):
     # draw a filled region of any type with a specified y offset
     rectangle_outlines = translate_rectg_vert(orig_rectangle, y_offset)
     crv_loop = DB.CurveLoop.Create(List[DB.Curve](rectangle_outlines))
     new_reg = DB.FilledRegion.Create(revit.doc, fill_type.Id, view.Id, [crv_loop])
+    new_reg.SetLineStyleId(line_style.Id)
     return new_reg
+
+
+def invis_style(doc=revit.doc):
+    invis = None
+    for gs in DB.FilteredElementCollector(doc).OfClass(DB.GraphicsStyle):
+        if gs.Name == "<Invisible lines>":
+            invis = gs
+
+    return invis
 
 
 view = revit.active_view
@@ -106,10 +116,10 @@ chosen_text_style = form.values["textstyle_combobox1"]
 
 # dims and scale
 scale = float(view.Scale)/100
-w = 3.25 * scale
-h = 1.3 * scale
+w = 3.28 * scale
+h = 0.787 * scale
 text_offset = 1 * scale
-shift = 2.32 * scale
+shift = 1.076 * scale
 h_offset = 5.25 * scale
 # create rectrangle
 crv_loop = DB.CurveLoop()
@@ -130,6 +140,9 @@ orig_rectangle = [l1, l2, l3, l4]
 offset = 0
 origin = DB.XYZ(0,shift,0)
 
+
+
+
 with revit.Transaction("Draw Legend"):
     for header in colour_scheme_od:
         # place header for group of items
@@ -143,7 +156,8 @@ with revit.Transaction("Draw Legend"):
         origin = DB.XYZ(origin.X, -(offset), origin.Z)
         for component in colour_scheme_od[header]:
             # draw rectangles with filled region
-            new_reg = draw_rectangle(offset, any_fill_type(), view)
+
+            new_reg = draw_rectangle(offset, any_fill_type(), view, invis_style())
             # override fill and colour
             ogs = DB.OverrideGraphicSettings()
             ogs.SetSurfaceForegroundPatternColor(colour_scheme_od[header][component])
