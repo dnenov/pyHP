@@ -1,4 +1,4 @@
-"""Transform rooms to generic model families"""
+"""Transform rooms to families"""
 
 from pyrevit import revit, DB, script, forms, HOST_APP
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
@@ -13,7 +13,7 @@ from pyrevit.revit.db import query
 class RoomsFilter(ISelectionFilter):
     def AllowElement(self, elem):
         try:
-            if elem.Category.Name == "Rooms":
+            if elem.Category.Id.IntegerValue == int(DB.BuiltInCategory.OST_Rooms):
                 return True
             else:
                 return False
@@ -28,6 +28,7 @@ class RoomsFilter(ISelectionFilter):
                 return False
         except AttributeError:
             return False
+
 
 
 def select_rooms_filter():
@@ -46,40 +47,10 @@ def convert_length_to_internal(d_units):
     units = revit.doc.GetUnits()
     if HOST_APP.is_newer_than(2021):
         internal_units = units.GetFormatOptions(DB.SpecTypeId.Length).GetUnitTypeId()
-    else:  # pre-2021
+    else: # pre-2021
         internal_units = units.GetFormatOptions(DB.UnitType.UT_Length).DisplayUnits
     converted = DB.UnitUtils.ConvertToInternalUnits(d_units, internal_units)
     return converted
-
-
-def get_shared_param_by_name_type(sp_name, sp_type):
-    # query shared parameters file and return the desired parameter by name and parameter type
-    # will return first result
-    spf = revit.doc.Application.OpenSharedParameterFile()
-    try:
-        for def_group in spf.Groups:
-            for sp in def_group.Definitions:
-                if sp.Name == sp_name and sp.ParameterType == sp_type:
-                    return sp
-        if not sp:
-            forms.alert("Shared parameter not found", ok=True, warn_icon=True)
-            return None
-    except:
-        forms.alert("Shared parameter not found", ok=True, warn_icon=True)
-        return None
-
-
-def param_set_by_cat(cat):
-    # get all project type parameters of a given category
-    # can be used to gather parameters for UI selection
-    all_gm = DB.FilteredElementCollector(revit.doc).OfCategory(cat).WhereElementIsElementType().ToElements()
-    parameter_set = []
-    for gm in all_gm:
-        params = gm.Parameters
-        for p in params:
-            if p not in parameter_set and p.IsReadOnly == False:
-                parameter_set.append(p)
-    return parameter_set
 
 
 def preselection_with_filter(bic):
@@ -126,6 +97,7 @@ def get_ref_lvl_plane(family_doc):
 
 
 def get_fam(family_name):
+    # get family symbol by family name, get any type
     fam_bip_id = DB.ElementId(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM)
     fam_bip_provider = DB.ParameterValueProvider(fam_bip_id)
     fam_filter_rule = DB.FilterStringRule(fam_bip_provider, DB.FilterStringEquals(), family_name, True)
@@ -139,49 +111,18 @@ def get_fam(family_name):
     return collector
 
 
-def get_family_slow_way(name):
-    # look for loaded families, workaround to deal with extra space
-    get_loaded = DB.FilteredElementCollector(revit.doc) \
-        .OfCategory(DB.BuiltInCategory.OST_GenericModel) \
-        .WhereElementIsNotElementType() \
-        .ToElements()
-    if get_loaded:
-        for el in get_loaded:
-            el_f_name = el.get_Parameter(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM).AsString()
-            if el_f_name.strip(" ") == name:
-                return el
-
-
-def room_to_extrusion(r, family_doc):
-    # room_height = r.get_Parameter(DB.BuiltInParameter.ROOM_HEIGHT).AsDouble()
-    room_height = convert_length_to_internal(2500)
-    # helper: define inverted transform to translate room geometry to origin
-    geo_translation = inverted_transform(r)
-    # collect room boundaries and translate them to origin
-    room_boundaries = room_bound_to_origin(r, geo_translation)
-    # skip if the boundaries are not a closed loop (can happen with misaligned boundaries)
-    if not room_boundaries:
-        print("Extrusion failed for room {}. Try fixing room boundaries".format(output.linkify(r.Id)))
-        return
-
-    ref_plane = get_ref_lvl_plane(family_doc)
-    # create extrusion, assign material, associate with shared parameter
+def get_shared_param_by_name_type(sp_name, sp_type):
+    # query shared parameters file and return the desired parameter by name and parameter type
+    # will return first result
+    spf = revit.doc.Application.OpenSharedParameterFile()
     try:
-        extrusion = family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
-                                                         room_height)
-
-        return extrusion
-
-    except Exceptions.InternalException:
-        print("Extrusion failed for room {}. Try fixing room boundaries".format(output.linkify(r.Id)))
-        return
-
-
-def assign_material_param(extrusion, mat_param, fam_doc):
-    ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
-    # create and associate a material parameter
-    new_mat_param = fam_doc.FamilyManager.AddParameter(mat_param,
-                                                              DB.BuiltInParameterGroup.PG_MATERIALS, False)
-    fam_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param,
-                                                                        new_mat_param)
-    return extrusion
+        for def_group in spf.Groups:
+            for sp in def_group.Definitions:
+                if sp.Name == sp_name and sp.ParameterType == sp_type:
+                    return sp
+        if not sp:
+            forms.alert("Shared parameter not found", ok=True, warn_icon=True)
+            return None
+    except:
+        forms.alert("Shared parameter not found", ok=True, warn_icon=True )
+        return None

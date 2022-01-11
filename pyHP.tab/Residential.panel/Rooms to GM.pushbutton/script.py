@@ -5,10 +5,11 @@ from pyrevit import revit, DB, script, forms, HOST_APP
 from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import tempfile
 import helper
+import re
 from pyrevit.revit.db import query
 
 logger = script.get_logger()
-
+output = script.get_output()
 # get shared parameter for the extrusion material
 
 
@@ -21,9 +22,9 @@ if not sp_unit_material:
 
 
 # use preselected elements, filtering rooms only
-pre_selection = helper.preselection_with_filter("Rooms")
+pre_selection = helper.preselection_with_filter(DB.BuiltInCategory.OST_Rooms)
 # or select rooms
-if pre_selection:
+if pre_selection and forms.alert("You have selected {} elements. Do you want to use them?".format(len(pre_selection))):
     selection = pre_selection
 else:
     selection = helper.select_rooms_filter()
@@ -31,8 +32,7 @@ else:
 if selection:
     # Create family doc from template
     # get file template from location
-    fam_template_path = "C:\ProgramData\Autodesk\RVT " + \
-                        HOST_APP.version + "\Family Templates\English\Metric Generic Model.rft"
+    fam_template_path = __revit__.Application.FamilyTemplatePath + "\Metric Generic Model.rft"
 
     # format parameters for UI
     # gather and organize Room parameters: (only editable text params)
@@ -97,28 +97,22 @@ if selection:
             dept = "Unit"
         # Room name:
         room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString()
-        #       print (room_name)
-        # except:
-        #   room_name = str(room.Id)
 
         # Room area:
         unit_area = room.get_Parameter(DB.BuiltInParameter.ROOM_AREA).AsDouble()
 
         # Room number (to be used as layout type differentiation)
         room_number = room.get_Parameter(DB.BuiltInParameter.ROOM_NUMBER).AsString()
-        # if not room_number:
-        #    room_number = str(room.Id)
 
         # construct family and family type names:
-        fam_name = project_number + "_" + str(dept) + "_" + room_name + "_" + room_number
-        # replace spaces
-        fam_name = fam_name.strip(" ")
-        fam_type_name = room_name
+        fam_name = str(dept) + "_" + room_name + "_" + room_number
+        # replace bad characters
+        fam_name = re.sub(r'[^\w\-_\. ]', '', fam_name)
+        fam_type_name = re.sub(r'[^\w\-_\. ]', '', room_name)
 
         # check if family already exists:
-        if helper.get_fam(fam_name):
-            while helper.get_fam(fam_name):
-                fam_name = fam_name + "_Copy 1"
+        while helper.get_fam(fam_name):
+            fam_name = fam_name + "_Copy 1"
 
         # Save family in temp folder
         fam_path = tempfile.gettempdir() + "/" + fam_name + ".rfa"
@@ -128,30 +122,17 @@ if selection:
 
         # Load Family into project
         with revit.Transaction("Load Family", revit.doc):
-            try:
-                loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
-                revit.doc.Regenerate()
-            except Exception as err:
-                logger.error(err)
+            loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
+            revit.doc.Regenerate()
 
         # Create extrusion from room boundaries
         with revit.Transaction(doc=new_family_doc, name="Create Extrusion"):
             try:
-                extrusion_height = helper.convert_length_to_internal(2500)
-                ref_plane = helper.get_ref_lvl_plane(new_family_doc)
-                # create extrusion, assign material, associate with shared parameter
-                extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
-                                                                         extrusion_height)
-                ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
-                try:
-                    new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
-                    DB.BuiltInParameterGroup.PG_MATERIALS, False)
-                    new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
-                except Exception as err:
-                    logger.error(err)
-
+                extrusion = helper.room_to_extrusion(room, new_family_doc)
+                helper.assign_material_param(extrusion, sp_unit_material, new_family_doc)
+                placement_point = room.Location.Point
             except Exception as err:
-                logger.error(err)
+                    logger.error(err)
 
         # save and close family
         save_opt = DB.SaveOptions()
@@ -162,28 +143,21 @@ if selection:
         with revit.Transaction("Reload Family", revit.doc):
             try:
                 loaded_f = revit.db.create.load_family(fam_path, doc=revit.doc)
-                revit.doc.Regenerate()
-                str_type = DB.Structure.StructuralType.NonStructural
                 # find family symbol and activate
-                fam_symbol = None
-                get_fam = DB.FilteredElementCollector(revit.doc).OfClass(DB.FamilySymbol).OfCategory(
-                    DB.BuiltInCategory.OST_GenericModel).WhereElementIsElementType().ToElements()
-                for fam in get_fam:
-                    type_name = fam.get_Parameter(DB.BuiltInParameter.SYMBOL_NAME_PARAM).AsString()
-                    if str.strip(type_name) == fam_name:
-                        fam_symbol = fam
-                        fam_symbol.Name = fam_type_name
-                        # set type parameters
-                        fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
-                        fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(unit_area)
-                        if not fam_symbol.IsActive:
-                            fam_symbol.Activate()
-                            revit.doc.Regenerate()
-
-                        # place family symbol at postision
-                        new_fam_instance = revit.doc.Create.NewFamilyInstance(room.Location.Point, fam_symbol, room.Level,
-                                                                              str_type)
-                        correct_lvl_offset = new_fam_instance.get_Parameter(
-                            DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
+                fam_symbol = helper.get_fam(fam_name)
+                if not fam_symbol.IsActive:
+                    fam_symbol.Activate()
+                    revit.doc.Regenerate()
+                # place family symbol at position
+                new_fam_instance = revit.doc.Create.NewFamilyInstance(placement_point, fam_symbol,
+                                                                      room.Level,
+                                                                      DB.Structure.StructuralType.NonStructural)
+                correct_lvl_offset = new_fam_instance.get_Parameter(
+                    DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
+                print(
+                    "Created and placed family instance : {1} - {2} {0} ".format(
+                        output.linkify(new_fam_instance.Id),
+                        fam_name, fam_type_name))
             except Exception as err:
                 logger.error(err)
+
