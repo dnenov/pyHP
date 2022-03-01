@@ -6,7 +6,8 @@ from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
 import tempfile
 import helper
 import re
-from pyrevit.revit.db import query
+import sys
+
 
 logger = script.get_logger()
 output = script.get_output()
@@ -46,7 +47,8 @@ if selection:
 
     if not gm_params_area:
         forms.alert(msg="No suitable parameter",
-                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit Area' of Area Type",
+                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit "
+                            "Area' of Area Type. The Unit Area parameter must be a Type parameter.",
                     ok=True,
                     warn_icon=True, exitscript=True)
 
@@ -62,12 +64,14 @@ if selection:
         ComboBox("gm_combobox2", gm_dict2),
         Button("Select")]
     form = FlexForm("Match parameters", components)
-    form.show()
-    # assign chosen parameters
-    chosen_room_param1 = form.values["room_combobox1"]
-    chosen_gm_param1 = form.values["gm_combobox1"]
-    chosen_gm_param2 = form.values["gm_combobox2"]
-
+    ok = form.show()
+    if ok:
+        # assign chosen parameters
+        chosen_room_param1 = form.values["room_combobox1"]
+        chosen_gm_param1 = form.values["gm_combobox1"]
+        chosen_gm_param2 = form.values["gm_combobox2"]
+    else:
+        sys.exit()
 
 
     # iterate through rooms
@@ -85,6 +89,7 @@ if selection:
                         sub_msg="There is no Generic Model Template",
                         ok=True,
                         warn_icon=True, exitscript=True)
+
         # Name the Family ( Proj_Ten_Type_Name : Ten_Type)
         # get values of selected Room parameters and replace with default values if empty:
         # Project Number:
@@ -148,10 +153,15 @@ if selection:
                 if not fam_symbol.IsActive:
                     fam_symbol.Activate()
                     revit.doc.Regenerate()
+
+                fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
+                fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(unit_area)
+
                 # place family symbol at position
                 new_fam_instance = revit.doc.Create.NewFamilyInstance(placement_point, fam_symbol,
                                                                       room.Level,
                                                                       DB.Structure.StructuralType.NonStructural)
+                # correct level offset
                 correct_lvl_offset = new_fam_instance.get_Parameter(
                     DB.BuiltInParameter.INSTANCE_FREE_HOST_OFFSET_PARAM).Set(0)
                 print(

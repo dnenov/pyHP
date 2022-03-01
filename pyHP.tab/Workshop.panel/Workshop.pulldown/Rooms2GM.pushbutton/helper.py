@@ -95,15 +95,45 @@ def inverted_transform(element):
     # Transform from the room location point to origin
     return translated_cs.Inverse
 
+
+def point_equal_list(pt, lst):
+    for el in list(lst):
+        if pt.IsAlmostEqualTo(el):
+            return el
+    else:
+        return None
+
+
+def get_open_ends(curves_list):
+    endpoints = []
+    for curve in curves_list:
+        for i in range(2):
+            duplicate = point_equal_list(curve.GetEndPoint(i), endpoints)
+            if duplicate:
+                endpoints.remove(duplicate)
+            else:
+                endpoints.append(curve.GetEndPoint(i))
+    if endpoints:
+        return endpoints
+    else:
+        return None
+
+
 def room_bound_to_origin (room, translation):
+    # iterate through room boundaries and translate them close to the origin
+    # also query open ends and return none if the loop is open
     room_boundaries = DB.CurveArrArray()
     # get room boundary segments
     room_segments = room.GetBoundarySegments(DB.SpatialElementBoundaryOptions())
     # iterate through loops of segments and add them to the array
     for seg_loop in room_segments:
+        curve_loop = [s.GetCurve() for s in seg_loop]
+        open_ends = get_open_ends(curve_loop)
+        if open_ends:
+            return None
         curve_array = DB.CurveArray()
-        for s in seg_loop:
-            old_curve = s.GetCurve()
+        for old_curve in curve_loop:
+            #old_curve = s.GetCurve()
             new_curve = old_curve.CreateTransformed(translation)  # move curves to origin
             curve_array.Append(new_curve)
         room_boundaries.Append(curve_array)
