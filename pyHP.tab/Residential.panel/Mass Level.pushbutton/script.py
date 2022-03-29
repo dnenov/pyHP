@@ -27,5 +27,6 @@ else:
 with revit.Transaction("Fill in Mass Levels",revit.doc):
     for m in masses:
         workplane = m.Host.get_Parameter(DB.BuiltInParameter.DATUM_TEXT).AsString()
+        correct_name = workplane.replace("Level ", "")
         m.LookupParameter(chosen_param).Set(workplane)
         # print (workplane)
