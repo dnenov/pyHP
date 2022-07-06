@@ -85,7 +85,9 @@ ui.set_config("viewkeyplan", form.values["vt_keyplan"])
 
 all_mass = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Mass).WhereElementIsNotElementType().ToElements()
 
-
+all_view_filters = DB.FilteredElementCollector(revit.doc).OfClass(DB.FilterElement).ToElements()
+overrides = DB.OverrideGraphicSettings()
+overrides.SetSurfaceTransparency(1)
 
 with revit.Transaction("Create Flat Type Sheets", revit.doc):
     for layout_type_name in unique_types:
@@ -99,13 +101,26 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
             if mass.LookupParameter(LAYOUT_PARAM_NAME).AsString() == layout_type_name:
                 host = mass.Host
                 if isinstance(host, DB.Level):
-                    all_levels_with_same_layout.append(host)
+                    all_levels_with_same_layout.append(host.Id)
+
+        layout_filter_id = None
+        filter_name = "Mass_"+ layout_type_name
+        for f in all_view_filters:
+            if str(f.Name) == str(filter_name):
+                layout_filter_id = f.Id
 
         key_plans = {}
-        for lvl in set(all_levels_with_same_layout):
-            kp= DB.ViewPlan.Create(revit.doc, fl_plan_type.Id, lvl.Id)
-            key_plans[kp] = lvl
+        for lvl_id in set(all_levels_with_same_layout):
+            kp = DB.ViewPlan.Create(revit.doc, fl_plan_type.Id, lvl_id)
+            key_plans[kp] = lvl_id
 
+        if layout_filter_id:
+            for kp in key_plans:
+                kp.AddFilter(layout_filter_id)
+                kp.SetFilterOverrides(layout_filter_id, overrides)
+
+        else:
+            pass
 
         layout_plan.CropBoxActive = True
         bb = fam_instance.get_BoundingBox(None)
@@ -120,9 +135,8 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         layout_name = "Layout - " + layout_type_name
         layout_plan.Name = database.unique_view_name(layout_name, suffix=" Plan")
 
-
         for k in key_plans:
-            keyplan_name = "Key Plan - " + layout_type_name + " - " + key_plans[k].Name
+            keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(key_plans[k]).Name
             k.Name = database.unique_view_name(keyplan_name, suffix=" Key Plan")
             database.apply_vt(k, chosen_vt_keyplan)
 
@@ -133,6 +147,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         # duplicate template schedule
         area_schedule_id = chosen_area_sh.Duplicate(DB.ViewDuplicateOption.Duplicate)
         area_schedule = revit.doc.GetElement(area_schedule_id)
+
 
         def find_field(sch, param):
             definition = sch.Definition
@@ -161,7 +176,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         tds = td.GetSectionData(DB.SectionType.Header)
         text = tds.GetCellText(0, 0)
         tds.SetCellText(0, 0, database.unique_view_name(string_value_type, suffix=" Area Schedule"))
-
+        area_schedule.Name = database.unique_view_name(string_value_type, suffix=" Mass Schedule")
         # create sheet
         sheet = database.create_sheet(chosen_sheet_nr, layout_name, chosen_tb.Id)
 
