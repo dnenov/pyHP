@@ -128,13 +128,14 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
             key_plans[kp] = lvl_id
 
         if not layout_filter_id:
-            f_rules = List[DB.FilterRule]
+            # if not found, create a new filter
+
             new_filter = DB.ParameterFilterElement.Create(revit.doc, "Mass - " + layout_type_name, filter_cats)
-            # sp_rule = DB.SharedParameterApplicableRule(LAYOUT_PARAM_NAME)
             sp = get_shared_param(LAYOUT_PARAM_NAME)
-            print (sp)
-            sp_id = sp.GUID
-            f_rules.Add(DB.ParameterFilterRuleFactory.CreateEqualsRule(sp_id, layout_type_name))
+            equals_rule = DB.ParameterFilterRuleFactory.CreateEqualsRule(sp.Id, layout_type_name, False)
+            f_rules = List[DB.FilterRule]([equals_rule])
+
+            layout_filter_id = new_filter.Id
         for kp in key_plans:
             kp.AddFilter(layout_filter_id)
             kp.SetFilterOverrides(layout_filter_id, overrides)
