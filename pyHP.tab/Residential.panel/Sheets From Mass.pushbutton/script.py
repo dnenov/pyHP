@@ -100,7 +100,13 @@ overrides.SetSurfaceTransparency(1)
 filter_cats = List[DB.ElementId](DB.ElementId(cat) for cat in [DB.BuiltInCategory.OST_Mass])
 
 
-
+def create_filter_from_rules(rules):
+    elem_filters = List[DB.ElementFilter]()
+    for rule in rules:
+        elem_param_filter = DB.ElementParameterFilter(rule)
+        elem_filters.Add(elem_param_filter)
+    el_filter = DB.LogicalAndFilter(elem_filters)
+    return el_filter
 
 with revit.Transaction("Create Flat Type Sheets", revit.doc):
     for layout_type_name in unique_types:
@@ -134,6 +140,10 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
             sp = get_shared_param(LAYOUT_PARAM_NAME)
             equals_rule = DB.ParameterFilterRuleFactory.CreateEqualsRule(sp.Id, layout_type_name, False)
             f_rules = List[DB.FilterRule]([equals_rule])
+
+            filt = create_filter_from_rules(f_rules)
+
+            new_filter.SetElementFilter(filt)
 
             layout_filter_id = new_filter.Id
         for kp in key_plans:
