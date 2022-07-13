@@ -3,6 +3,15 @@ from rpw.ui.forms import FlexForm, Label, TextBox, Button, ComboBox, CheckBox, S
 from pyHP import select, database, geo, units
 import sys
 import ui, locator
+from pyrevit.framework import List
+
+
+def get_shared_param(sp_name):
+
+    col = DB.FilteredElementCollector(revit.doc).OfClass(DB.SharedParameterElement).ToElements()
+    for param in col:
+        if param.Name == sp_name:
+            return param
 
 
 # prerequisites
@@ -88,6 +97,10 @@ all_mass = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.
 all_view_filters = DB.FilteredElementCollector(revit.doc).OfClass(DB.FilterElement).ToElements()
 overrides = DB.OverrideGraphicSettings()
 overrides.SetSurfaceTransparency(1)
+filter_cats = List[DB.ElementId](DB.ElementId(cat) for cat in [DB.BuiltInCategory.OST_Mass])
+
+
+
 
 with revit.Transaction("Create Flat Type Sheets", revit.doc):
     for layout_type_name in unique_types:
@@ -114,13 +127,17 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
             kp = DB.ViewPlan.Create(revit.doc, fl_plan_type.Id, lvl_id)
             key_plans[kp] = lvl_id
 
-        if layout_filter_id:
-            for kp in key_plans:
-                kp.AddFilter(layout_filter_id)
-                kp.SetFilterOverrides(layout_filter_id, overrides)
-
-        else:
-            pass
+        if not layout_filter_id:
+            f_rules = List[DB.FilterRule]
+            new_filter = DB.ParameterFilterElement.Create(revit.doc, "Mass - " + layout_type_name, filter_cats)
+            # sp_rule = DB.SharedParameterApplicableRule(LAYOUT_PARAM_NAME)
+            sp = get_shared_param(LAYOUT_PARAM_NAME)
+            print (sp)
+            sp_id = sp.GUID
+            f_rules.Add(DB.ParameterFilterRuleFactory.CreateEqualsRule(sp_id, layout_type_name))
+        for kp in key_plans:
+            kp.AddFilter(layout_filter_id)
+            kp.SetFilterOverrides(layout_filter_id, overrides)
 
         layout_plan.CropBoxActive = True
         bb = fam_instance.get_BoundingBox(None)
@@ -176,7 +193,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         tds = td.GetSectionData(DB.SectionType.Header)
         text = tds.GetCellText(0, 0)
         tds.SetCellText(0, 0, database.unique_view_name(string_value_type, suffix=" Area Schedule"))
-        area_schedule.Name = database.unique_view_name(string_value_type, suffix=" Mass Schedule")
+        area_schedule.Name = database.unique_schedule_name(string_value_type, suffix=" Mass Schedule")
         # create sheet
         sheet = database.create_sheet(chosen_sheet_nr, layout_name, chosen_tb.Id)
 

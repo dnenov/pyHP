@@ -25,6 +25,16 @@ def get_view(some_name):
     return found_view
 
 
+def get_schedule(some_name):
+    sch_name_filter = query.get_biparam_stringequals_filter({DB.BuiltInParameter.VIEW_NAME: some_name})
+    found_sch = DB.FilteredElementCollector(revit.doc) \
+        .OfCategory(DB.BuiltInCategory.OST_Schedules) \
+        .WherePasses(sch_name_filter) \
+        .WhereElementIsNotElementType().ToElements()
+
+    return found_sch
+
+
 def get_fam_types(family_name):
     fam_bip_id = DB.ElementId(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM)
     fam_bip_provider = DB.ParameterValueProvider(fam_bip_id)
@@ -245,6 +255,13 @@ def unique_view_name(name, suffix=None):
     while get_view(unique_v_name):
         unique_v_name = unique_v_name + " Copy 1"
     return unique_v_name
+
+
+def unique_schedule_name(name, suffix=None):
+    unique_s_name = name + suffix
+    while get_schedule(unique_s_name):
+        unique_s_name = unique_s_name + " Copy 1"
+    return unique_s_name
 
 
 def shift_list(l, n):
