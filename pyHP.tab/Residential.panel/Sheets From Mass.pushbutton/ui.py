@@ -2,16 +2,17 @@ class UI:
     def __init__(self, script):
         self.script = script
         self.config = script.get_config()
-        # self.is_metric = True
         self.titleblock_dict = {}
         self.vt_layout_dict = {}
         self.viewsection_dict = {}
         self.viewport_dict = {}
+        self.massparam_dict = {}
         self.titleblock = None
         # self.tblock_orientation = ['Vertical', 'Horizontal']
         # self.layout_orientation = ['Tiles', 'Cross']
         self.sheet_number = self.config.get_option('sheet_number', '1000')
         self.crop_offset = self.config.get_option('crop_offset', '350')
+        self.massparam = self.config.get_option('massparam', self.massparam_dict[0])
         # self.titleblock_offset = self.config.get_option('titleblock_offset', '165')
         # self.titleblock_orientation = self.config.get_option('titleblock_orientation', self.tblock_orientation[0])
         # self.layout_ori = self.config.get_option('layout_ori', self.layout_orientation[0])
@@ -40,10 +41,6 @@ class UI:
         #     self.config.titleblock_orientation = val
         # if var == "layout_orientation":
         #     self.config.layout_ori = val
-        # if var == "rotated_elevations":
-        #     self.config.rotated_elevations = val
-        # if var == "el_as_sec":
-        #     self.config.el_as_sec = val
         if var == "titleblock":
             self.config.titleblock = val
         if var == "viewplan":
@@ -54,6 +51,8 @@ class UI:
             self.config.viewsection = val
         if var == "viewport":
             self.config.viewport = val
+        if var == "massparam":
+            self.config.massparam = val
             
 
         self.script.save_config()

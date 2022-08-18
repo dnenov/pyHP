@@ -4,7 +4,6 @@ from pyrevit import revit, DB, script, forms, HOST_APP, coreutils
 from pyrevit.revit.db import query
 
 
-
 def get_sheet(some_number):
     sheet_nr_filter = query.get_biparam_stringequals_filter({DB.BuiltInParameter.SHEET_NUMBER: str(some_number)})
     found_sheet = DB.FilteredElementCollector(revit.doc) \
@@ -62,19 +61,21 @@ def get_fam_any_type(family_name):
     return collector
 
 
-
-def param_set_by_cat(cat):
-    # get all project type parameters of a given category
+def param_id_set_by_cat(cat, is_instance_param=False, storage_type = "String"):
+    # get all project type or instance parameters (as parameter Id) of a given category and storage type
     # can be used to gather parameters for UI selection
-    all_gm = DB.FilteredElementCollector(revit.doc).OfCategory(cat).WhereElementIsElementType().ToElements()
-    parameter_set = []
-    for gm in all_gm:
-        params = gm.Parameters
-        for p in params:
-            if p not in parameter_set and p.IsReadOnly == False:
-                parameter_set.append(p)
-    return parameter_set
 
+    if is_instance_param:
+        collector = DB.FilteredElementCollector(revit.doc).OfCategory(cat).WhereElementIsNotElementType().ToElements()
+    else:
+        collector = DB.FilteredElementCollector(revit.doc).OfCategory(cat).WhereElementIsElementType().ToElements()
+    param_id_set = []
+    for el in collector:
+        params = el.Parameters
+        for p in params:
+            if p.Definition.Id not in param_id_set and p.IsReadOnly == False and p.StorageType.ToString() == storage_type:
+                param_id_set.append(p.Definition.Id)
+    return param_id_set
 
 
 def create_sheet(sheet_num, sheet_name, titleblock):
@@ -106,7 +107,7 @@ def get_name(el):
     return DB.Element.Name.__get__(el)
 
 
-def create_parallel_bbox(line, crop_elem, offset=300/304.8):
+def create_parallel_bbox(line, crop_elem, offset=300 / 304.8):
     # create section parallel to x (solution by Building Coder)
     p = line.GetEndPoint(0)
     q = line.GetEndPoint(1)
@@ -139,15 +140,15 @@ def create_parallel_bbox(line, crop_elem, offset=300/304.8):
     section_box.Max = max
 
     pt = DB.XYZ(centerpoint.X, centerpoint.Y, minZ)
-    point_in_front = pt+(-3)*view_direction
-    #TODO: check other usage
+    point_in_front = pt + (-3) * view_direction
+    # TODO: check other usage
     return section_box
 
 
 def char_series(nr):
     from string import ascii_uppercase
     series = []
-    for i in range(0,nr):
+    for i in range(0, nr):
         series.append(ascii_uppercase[i])
     return series
 
@@ -159,7 +160,7 @@ def char_i(i):
 
 def get_view_family_types(viewtype, doc):
     return [vt for vt in DB.FilteredElementCollector(doc).OfClass(DB.ViewFamilyType) if
-                vt.ViewFamily == viewtype]
+            vt.ViewFamily == viewtype]
 
 
 def get_generic_template_path():
@@ -187,8 +188,11 @@ def get_generic_template_path():
     if isfile(gen_template_path):
         return gen_template_path
     else:
-        forms.alert(title="No Generic Template Found", msg="There is no Generic Model Template in the default location. Can you point where to get it?", ok=True)
-        fam_template_path = forms.pick_file(file_ext="rft", init_dir="C:\ProgramData\Autodesk\RVT "+HOST_APP.version+"\Family Templates")
+        forms.alert(title="No Generic Template Found",
+                    msg="There is no Generic Model Template in the default location. Can you point where to get it?",
+                    ok=True)
+        fam_template_path = forms.pick_file(file_ext="rft",
+                                            init_dir="C:\ProgramData\Autodesk\RVT " + HOST_APP.version + "\Family Templates")
         return fam_template_path
 
 
@@ -217,8 +221,11 @@ def get_mass_template_path():
     if isfile(mass_template_path):
         return mass_template_path
     else:
-        forms.alert(title="No Mass Template Found", msg="There is no Mass Model Template in the default location. Can you point where to get it?", ok=True)
-        fam_template_path = forms.pick_file(file_ext="rft", init_dir="C:\ProgramData\Autodesk\RVT "+HOST_APP.version+"\Family Templates")
+        forms.alert(title="No Mass Template Found",
+                    msg="There is no Mass Model Template in the default location. Can you point where to get it?",
+                    ok=True)
+        fam_template_path = forms.pick_file(file_ext="rft",
+                                            init_dir="C:\ProgramData\Autodesk\RVT " + HOST_APP.version + "\Family Templates")
         return fam_template_path
 
 
@@ -231,13 +238,13 @@ def vt_name_match(vt_name, doc):
             vt_match = v.Name
     return vt_match
 
-    
+
 def vp_name_match(vp_name, doc):
     # return a view template with a given name, None if not found
     views = DB.FilteredElementCollector(doc).OfClass(DB.Viewport)
     for v in views:
         if v.Name == vp_name:
-            return v.Name            
+            return v.Name
     return views.FirstElement().Name
 
 
@@ -249,6 +256,7 @@ def tb_name_match(tb_name, doc):
         if revit.query.get_name(tb) == tb_name:
             tb_match = revit.query.get_name(tb)
     return tb_match
+
 
 def unique_view_name(name, suffix=None):
     unique_v_name = name + suffix
@@ -277,7 +285,7 @@ def get_viewport_types(doc=revit.doc):
 
     collector = DB.FilteredElementCollector(doc) \
         .WherePasses(param_filter) \
-        .WhereElementIsElementType()\
+        .WhereElementIsElementType() \
         .ToElements()
 
     return collector
@@ -297,11 +305,9 @@ def get_vp_by_name(name, doc=revit.doc):
 
     and_filter = DB.LogicalAndFilter(param_filter, type_filter)
 
-
-
     collector = DB.FilteredElementCollector(doc) \
         .WherePasses(and_filter) \
-        .WhereElementIsElementType()\
+        .WhereElementIsElementType() \
         .FirstElement()
 
     return collector

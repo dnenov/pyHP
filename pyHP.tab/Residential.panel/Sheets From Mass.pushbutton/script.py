@@ -13,6 +13,42 @@ def get_shared_param(sp_name):
         if param.Name == sp_name:
             return param
 
+# ask which parameter is used for Layout Type
+# for this scenario, an instance Text parameter will be used
+mass_param_set = database.param_id_set_by_cat(DB.BuiltInCategory.OST_Mass, is_instance_param=True, storage_type = "String")
+
+# TODO: STUCK HERE TRYING TO OFFER THE CHOICE OF BOTH BUILTIN AND SHARED PARAMETERS
+
+mass_param_dict = {}
+for p_id in mass_param_set:
+    # dictionary of bip/guid and parameter names
+    p = revit.doc.GetElement(p_id)
+    if isinstance(p, DB.SharedParameterElement):
+        # for shared, guid and name
+        mass_param_dict[p.GuidValue]= p.Name
+    else:
+        # find bip by id
+
+        # TODO: find out how to find the BIP by id????
+        mass_param_dict[p_id]=str(p_id)
+
+
+ui.mass_param_dict = mass_param_dict
+print (ui.mass_param_dict)
+components1 = [
+    Label("Which parameter stores the Unit Type Name?"),
+    ComboBox(name="param", options=sorted(mass_param_dict.values())),
+    Separator(),
+    Button("Select")
+]
+form1 = FlexForm("Fill in parameters", components1)
+ok1 = form1.show()
+
+if ok1:
+    # match the variables with user input
+    chosen_massparam = form1.values["param"]
+
+print (chosen_massparam)
 
 # prerequisites
 ui = ui.UI(script)
@@ -47,7 +83,7 @@ selection = select.select_with_cat_filter(cat, "Select a Mass")
 LAYOUT_PARAM_NAME = "Unit Layout Name"
 unique_types = {m.LookupParameter(LAYOUT_PARAM_NAME).AsString(): m for m in selection}
 
-components = [
+components2 = [
     Label("Select Titleblock"),
     ComboBox(name="tb", options=sorted(ui.titleblock_dict), default=database.tb_name_match(ui.titleblock, revit.doc)),
     Label("Sheet Number"),
@@ -71,18 +107,18 @@ components = [
     Button("Select"),
 ]
 
-form = FlexForm("Fill in parameters", components)
-ok = form.show()
+form2 = FlexForm("Fill in parameters", components2)
+ok2 = form2.show()
 
-if ok:
+if ok2:
     # match the variables with user input
-    chosen_sheet_nr = form.values["sheet_number"]
-    chosen_vt_layout = ui.vt_layout_dict[form.values["vt_layout"]]
-    chosen_vt_keyplan = ui.vt_layout_dict[form.values["vt_keyplan"]]
-    chosen_tb = ui.titleblock_dict[form.values["tb"]]
-    chosen_vp_type = ui.viewport_dict[form.values["vp_types"]]
-    chosen_crop_offset = units.correct_input_units(form.values["crop_offset"], revit.doc)
-    chosen_area_sh = sh_dict[form.values["area_sh"]]
+    chosen_sheet_nr = form2.values["sheet_number"]
+    chosen_vt_layout = ui.vt_layout_dict[form2.values["vt_layout"]]
+    chosen_vt_keyplan = ui.vt_layout_dict[form2.values["vt_keyplan"]]
+    chosen_tb = ui.titleblock_dict[form2.values["tb"]]
+    chosen_vp_type = ui.viewport_dict[form2.values["vp_types"]]
+    chosen_crop_offset = units.correct_input_units(form2.values["crop_offset"], revit.doc)
+    chosen_area_sh = sh_dict[form2.values["area_sh"]]
 else:
     sys.exit()
 
