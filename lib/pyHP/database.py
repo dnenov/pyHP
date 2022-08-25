@@ -233,7 +233,7 @@ def get_mass_template_path():
         return fam_template_path
 
 
-def vt_name_match(vt_name, doc):
+def vt_name_match(vt_name, doc=revit.doc):
     # return a view template with a given name, None if not found
     views = DB.FilteredElementCollector(doc).OfClass(DB.View)
     vt_match = None
@@ -243,8 +243,8 @@ def vt_name_match(vt_name, doc):
     return vt_match
 
 
-def vp_name_match(vp_name, doc):
-    # return a view template with a given name, None if not found
+def vp_name_match(vp_name, doc=revit.doc):
+    # return a viewport with a given name, or any
     views = DB.FilteredElementCollector(doc).OfClass(DB.Viewport)
     for v in views:
         if v.Name == vp_name:
@@ -252,14 +252,28 @@ def vp_name_match(vp_name, doc):
     return views.FirstElement().Name
 
 
-def tb_name_match(tb_name, doc):
+def tb_name_match(lookup_name, doc=revit.doc):
+    # the lookup name format is Family Name : Type Name
     titleblocks = DB.FilteredElementCollector(doc).OfCategory(
         DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType()
-    tb_match = None
     for tb in titleblocks:
-        if revit.query.get_name(tb) == tb_name:
-            tb_match = revit.query.get_name(tb)
-    return tb_match
+        print (revit.query.get_name(tb), lookup_name)
+        tb_name = revit.query.get_family_name(tb) + " : " + revit.query.get_name(tb)
+        if tb_name == lookup_name:
+            tb_match = str(revit.query.get_name(tb))
+            print (revit.query.get_name(tb), tb_match)
+            return tb_match
+    return lookup_name
+
+
+def sh_name_match(sh_name, doc=revit.doc):
+    schedules = DB.FilteredElementCollector(doc).OfCategory(
+        DB.BuiltInCategory.OST_Schedules).WhereElementIsNotElementType()
+    sh_match = None
+    for sh in schedules:
+        if revit.query.get_name(sh) == sh_name:
+            sh_match = revit.query.get_name(sh)
+    return sh_match
 
 
 def unique_view_name(name, suffix=None):

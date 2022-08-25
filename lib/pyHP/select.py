@@ -30,7 +30,7 @@ class CatFilter(ISelectionFilter):
 def select_with_cat_filter(cat, message):
     pre_selection = preselection_with_filter(cat)
     if pre_selection and forms.alert(
-            "You have selected {} elements. Do you want to use them?".format(len(pre_selection))):
+            "You have selected {} elements. Do you want to use them?".format(len(pre_selection)), no=True):
         selection = pre_selection
     else:
         # select elements while applying category filter
@@ -43,6 +43,7 @@ def select_with_cat_filter(cat, message):
     if not selection:
         forms.alert("You need to select at least one element.", exitscript=True)
     return selection
+
 
 def select_rooms_filter():
     # select elements while applying category filter
@@ -63,5 +64,3 @@ def preselection_with_filter(cat):
         if sel_el.Category.Id.IntegerValue == int(cat):
             pre_selection.append(sel_el)
     return pre_selection
-
-
