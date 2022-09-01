@@ -8,23 +8,24 @@ class Locator:
     elevations = [] # class variable - elevation location
 
     '''Constructor'''
-    def __init__(self, sheet, offset, titleblock, layout):
+    def __init__(self, sheet, offset, titleblock, layout, kp_count):
         if layout == 'Tiles':
             col = 4
-            row = 2
+            row = 6
         elif layout == 'Cross':
             col = 4
             row = 3
-        self.pos = self.get_sheet_pos(sheet, offset, col, row, titleblock)        
+        self.pos = self.get_sheet_pos(sheet, offset, col, row, titleblock)
+        self.kp = kp_count
         self.set_pos(self.pos, layout)
 
     '''Set positions based on the type of layout
     Allows us to introduce future layouts or layout management ui'''
     def set_pos(self, pos, layout):
         if layout == 'Tiles':            
-            self.plan = (pos[4] + pos[6])/2
-            self.rcp = (pos[5] + pos[7])/2
-            self.elevations = [pos[1], pos[3], pos[0], pos[2]]
+            self.plan = (pos[14] + pos[20])/2
+            self.sh = pos[16]
+            self.keyplans = [pos[i] for i in range(self.kp-1)]
 
         elif layout == 'Cross':            
             self.plan = pos[4]
@@ -66,6 +67,9 @@ class Locator:
     but we could not reverse engineer the algorithm used by the Gods of Revit'''
     def realign_pos(self, doc, views, positions):
         for view, pos in izip(views, positions):
-            actual = view.GetBoxCenter()
+            try:
+                actual = view.GetBoxCenter()
+            except Exception:
+                actual = view.Point
             delta = pos - actual # substract the desired position from the actual position
             DB.ElementTransformUtils.MoveElement(doc, view.Id, delta)

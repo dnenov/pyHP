@@ -4,6 +4,7 @@ from pyHP import select, database, geo, units
 import sys
 import ui, locator
 from pyrevit.framework import List
+from itertools import izip
 
 # prerequisites
 
@@ -39,25 +40,13 @@ else:
     sys.exit()
 
 
+def key_or_none (dict, key):
+    try:
+        v = dict[key]
+        return v
+    except:
+        return None
 
-
-# prep and fill in default values for the next UI
-
-# viewplans = DB.FilteredElementCollector(revit.doc).OfClass(DB.ViewPlan)  # collect view plans
-# ui.vt_layout_dict \
-#     = {v.Name: v for v in viewplans if v.IsTemplate}  # only fetch IsTemplate plans
-# ui.vt_layout_dict["<None>"] = None # add None as a choice
-# use a special collector w viewport param
-# ui.viewport_dict = {database.get_name(v): v for v in
-#                     database.get_viewport_types(revit.doc)}
-# collect titleblocks (there may be a better method in pyrevit lib)
-# titleblocks = DB.FilteredElementCollector(revit.doc).OfCategory(
-#     DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType().ToElements()
-# ui.titleblock_dict = {'{} : {}'.format(tb.FamilyName, revit.query.get_name(tb)): tb for tb in titleblocks}
-# all_schedules = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Schedules).WhereElementIsNotElementType()
-# schedules = [s for s in all_schedules if "<Revision Schedule>" not in str(s.Title)]
-# sh_dict = {revit.query.get_name(sh): sh for sh in schedules}
-# ui.schedule_dict = sh_dict
 
 category = DB.BuiltInCategory.OST_Mass
 ui.view_temp_dict = database.templates_dict()
@@ -73,28 +62,8 @@ ui.set_viewtemplates()
 ui.set_schedules()
 
 fl_plan_type = database.get_view_family_types(DB.ViewFamily.FloorPlan, revit.doc)[0]
-# print (ui.titleblock_dict.values())
-# print (ui.titleblock_dict[ui.titleblock])
-#
-# print (ui.view_temp_dict.values())
-# print (ui.view_temp_dict[ui.viewplan])
-# print (ui.view_temp_dict[ui.viewkeyplan])
-#
-# print (ui.viewport_dict)
-# print (ui.viewport_dict[ui.viewport])
-#
-# print (ui.schedule_dict)
-# print (ui.schedule_dict[ui.schedule])
-
-def key_or_none (dict, key):
-    try:
-        v = dict[key]
-        return v
-    except:
-        return None
 
 def_tb = key_or_none(ui.titleblock_dict, ui.titleblock)
-print (def_tb)
 def_vt_layout = key_or_none(ui.view_temp_dict, ui.viewplan)
 def_vt_keyplan = key_or_none(ui.titleblock_dict, ui.viewkeyplan)
 def_viewport = key_or_none(ui.viewport_dict, ui.viewport)
@@ -145,14 +114,9 @@ if ok2:
     chosen_sheet_nr = form2.values["sheet_number"]
     chosen_vt_layout_id = database.key_by_val(ui.view_temp_dict, form2.values["vt_layout"])
     chosen_vt_keyplan_id = database.key_by_val(ui.view_temp_dict, form2.values["vt_keyplan"])
-    # chosen_vt_keyplan = ui.view_temp_dict[form2.values["vt_keyplan"]]
-    # chosen_tb = ui.titleblock_dict[form2.values["tb"]]
-    # chosen_vp_type = ui.viewport_dict[form2.values["vp_types"]]
-    # chosen_crop_offset = units.correct_input_units(form2.values["crop_offset"], revit.doc)
-    # chosen_area_sh = ui.schedule_dict[form2.values["area_sh"]]
     chosen_tb_id = database.key_by_val(ui.titleblock_dict, form2.values["tb"])
     chosen_vp_type_id = database.key_by_val(ui.viewport_dict, form2.values["vp_types"])
-    chosen_crop_offset_id = units.correct_input_units(form2.values["crop_offset"], revit.doc)
+    chosen_crop_offset = units.correct_input_units(form2.values["crop_offset"], revit.doc)
     chosen_area_sh_id = database.key_by_val(ui.schedule_dict,form2.values["area_sh"])
 else:
     sys.exit()
@@ -243,7 +207,6 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         # apply view template
         database.apply_vt(layout_plan, revit.doc.GetElement(DB.ElementId(chosen_vt_layout_id)))
 
-
         # duplicate template schedule
         schedule_template = revit.doc.GetElement(DB.ElementId(chosen_area_sh_id))
         area_schedule_id = schedule_template.Duplicate(DB.ViewDuplicateOption.Duplicate)
@@ -282,28 +245,34 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         sheet = database.create_sheet(chosen_sheet_nr, layout_name, DB.ElementId(chosen_tb_id))
 
         # get positions on sheet
-        loc = locator.Locator(sheet, 5.1, 'Vertical', 'Tiles')
+        loc = locator.Locator(sheet, chosen_crop_offset, 'Vertical', 'Tiles', len(key_plans))
         layout_position = loc.plan
-        keyplan_position = loc.rcp
+        sh_position = loc.sh
+        keyplan_positions = loc.keyplans
+
+        # collect all key plans
+        kps = []
 
         # place view on sheet
         place_layout = DB.Viewport.Create(revit.doc, sheet.Id, layout_plan.Id, layout_position)
         place_area_sh = DB.ScheduleSheetInstance.Create(revit.doc, sheet.Id, area_schedule.Id, layout_position)
-        place_keyplan = [DB.Viewport.Create(revit.doc, sheet.Id, kp.Id, keyplan_position) for kp in key_plans]
+        for pos, kp in izip(keyplan_positions, key_plans):
+            place_keyplan = DB.Viewport.Create(revit.doc, sheet.Id, kp.Id, pos)
+            kps.append(place_keyplan)
         # for kp in key_plans:
         #     place_keyplan = DB.Viewport.Create(revit.doc, sheet.Id, kp.Id, keyplan_position)
         #     kp.ChangeTypeId(chosen_vp_type.Id)
 
         # new: change viewport types
-        for vp in [place_layout] + place_keyplan:
+        for vp in [place_layout] + kps:
             vp.ChangeTypeId(DB.ElementId(chosen_vp_type_id))
 
         revit.doc.Regenerate()
 
         # realign the viewports to their desired positions
         loc.realign_pos(revit.doc, [place_layout], [layout_position])
-        loc.realign_pos(revit.doc, place_keyplan, [keyplan_position])
-        # loc.realign_pos(revit.doc, [place_area_sh], [keyplan_position])
+        loc.realign_pos(revit.doc, kps, keyplan_positions)
+        loc.realign_pos(revit.doc, [place_area_sh], [sh_position])
 
 
         print("Sheet : {0} \t Layout {1} ".format(output.linkify(sheet.Id), layout_type_name))
