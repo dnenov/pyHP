@@ -107,7 +107,9 @@ def apply_vt(v, vt):
     return
 
 
-def get_name(el):
+def get_name(el, doc=revit.doc):
+    if isinstance(el, DB.ElementId):
+        el = doc.GetElement(el)
     return DB.Element.Name.__get__(el)
 
 
@@ -233,6 +235,44 @@ def get_mass_template_path():
         return fam_template_path
 
 
+def id_name_dict (lst, int_value=False):
+    if int_value:
+        return {el.Id.IntegerValue : get_name(el) for el in lst}
+    else:
+        return {el.Id: get_name(el) for el in lst}
+
+
+def key_by_val(dict, val):
+    for k, v in dict.items():
+        if v == val:
+            return k
+
+
+def templates_dict(doc=revit.doc):
+    # all view templates in a doc
+    viewplans = DB.FilteredElementCollector(doc).OfClass(DB.ViewPlan)
+    viewtemplates = [v for v in viewplans if v.IsTemplate]
+    return id_name_dict(viewtemplates, True)
+
+
+def tb_types_dict(doc=revit.doc):
+    tbs = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType().ToElements()
+    return id_name_dict(tbs, True)
+
+
+def sh_dict(cat=None, doc=revit.doc):
+    # get all schedules except revision schedules, output dict {}
+    all_sh = DB.FilteredElementCollector(doc).OfCategory(DB.BuiltInCategory.OST_Schedules).WhereElementIsNotElementType()
+    if cat:
+        all_sh = [sh for sh in all_sh if sh.Definition.CategoryId == DB.Category.GetCategory(doc, cat).Id]
+    shs = [sh for sh in all_sh if "<Revision Schedule>" not in str(sh.Title)]
+    return id_name_dict(shs, True)
+
+
+def viewport_dict(doc=revit.doc):
+    return id_name_dict(get_viewport_types(doc), True)
+
+
 def vt_name_match(vt_name, doc=revit.doc):
     # return a view template with a given name, None if not found
     views = DB.FilteredElementCollector(doc).OfClass(DB.View)
@@ -257,11 +297,9 @@ def tb_name_match(lookup_name, doc=revit.doc):
     titleblocks = DB.FilteredElementCollector(doc).OfCategory(
         DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType()
     for tb in titleblocks:
-        print (revit.query.get_name(tb), lookup_name)
         tb_name = revit.query.get_family_name(tb) + " : " + revit.query.get_name(tb)
         if tb_name == lookup_name:
             tb_match = str(revit.query.get_name(tb))
-            print (revit.query.get_name(tb), tb_match)
             return tb_match
     return lookup_name
 

@@ -11,15 +11,16 @@ ui = ui.UI(script)
 output = script.get_output()
 
 # first collect all params of Mass category, instance, String
-mass_param_dict = database.param_dict_by_cat(DB.BuiltInCategory.OST_Mass, is_instance_param=True, storage_type = "String")
-ui.mass_param_dict = mass_param_dict
+mass_param_dict = database.param_dict_by_cat(DB.BuiltInCategory.OST_Mass, is_instance_param=True, storage_type="String")
+ui.massparam_dict = mass_param_dict
+# print(ui.mass_param_dict)
 ui.set_massparam()
 # ask which parameter is used for Layout Type (ex. "1B2P - Type A" or "Flat Type D")
-
 
 components1 = [
     Label("Which parameter stores the Unit Type Name?"),
     ComboBox(name="param", options=sorted(mass_param_dict.values()), default=ui.massparam),
+    # ComboBox(name="param", options=sorted(mass_param_dict.values())),
     Separator(),
     Button("Select")
 ]
@@ -28,76 +29,109 @@ ok1 = form1.show()
 
 if ok1:
     chosen_massparam_name = form1.values["param"]
+    ui.set_config("massparam", chosen_massparam_name)
+    # using the param name (dict value), get the parameter itself
+    # for k, v in mass_param_dict.items():
+    #     if v == chosen_massparam_name:
+    #         chosen_massparam = k
+    chosen_massparam = database.key_by_val(mass_param_dict, chosen_massparam_name)
 else:
     sys.exit()
 
-ui.set_config("massparam", chosen_massparam_name)
 
-# using the param name (dict value), get the parameter itself
-for k, v in mass_param_dict.items():
-    if v == chosen_massparam_name:
-        chosen_massparam = k
+
 
 # prep and fill in default values for the next UI
-viewplans = DB.FilteredElementCollector(revit.doc).OfClass(DB.ViewPlan)  # collect view plans
-ui.vt_layout_dict \
-    = {v.Name: v for v in viewplans if v.IsTemplate}  # only fetch IsTemplate plans
-ui.vt_layout_dict["<None>"] = None # add None as a choice
-# use a special collector w viewport param
-ui.viewport_dict = {database.get_name(v): v for v in
-                    database.get_viewport_types(revit.doc)}
-# collect titleblocks (there may be a better method in pyrevit lib)
-titleblocks = DB.FilteredElementCollector(revit.doc).OfCategory(
-    DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType().ToElements()
-if not titleblocks:
-    forms.alert("There are no Titleblocks loaded in the model.", exitscript=True)
-ui.titleblock_dict = {'{} : {}'.format(tb.FamilyName, revit.query.get_name(tb)): tb for tb in titleblocks}
 
-# TODO: remember last choice
-all_schedules = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Schedules).WhereElementIsNotElementType()
-schedules = [s for s in all_schedules if "<Revision Schedule>" not in str(s.Title)]
-sh_dict = {revit.query.get_name(sh): sh for sh in schedules}
-ui.schedule_dict = sh_dict
+# viewplans = DB.FilteredElementCollector(revit.doc).OfClass(DB.ViewPlan)  # collect view plans
+# ui.vt_layout_dict \
+#     = {v.Name: v for v in viewplans if v.IsTemplate}  # only fetch IsTemplate plans
+# ui.vt_layout_dict["<None>"] = None # add None as a choice
+# use a special collector w viewport param
+# ui.viewport_dict = {database.get_name(v): v for v in
+#                     database.get_viewport_types(revit.doc)}
+# collect titleblocks (there may be a better method in pyrevit lib)
+# titleblocks = DB.FilteredElementCollector(revit.doc).OfCategory(
+#     DB.BuiltInCategory.OST_TitleBlocks).WhereElementIsElementType().ToElements()
+# ui.titleblock_dict = {'{} : {}'.format(tb.FamilyName, revit.query.get_name(tb)): tb for tb in titleblocks}
+# all_schedules = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Schedules).WhereElementIsNotElementType()
+# schedules = [s for s in all_schedules if "<Revision Schedule>" not in str(s.Title)]
+# sh_dict = {revit.query.get_name(sh): sh for sh in schedules}
+# ui.schedule_dict = sh_dict
+
+category = DB.BuiltInCategory.OST_Mass
+ui.view_temp_dict = database.templates_dict()
+ui.viewport_dict = database.viewport_dict()
+tb_types = database.tb_types_dict()
+if not tb_types:
+    forms.alert("There are no Titleblocks loaded in the model.", exitscript=True)
+ui.titleblock_dict = tb_types
+ui.schedule_dict = database.sh_dict(category)
 ui.set_titleblocks()
 ui.set_vp_types()
 ui.set_viewtemplates()
 ui.set_schedules()
-cat = DB.BuiltInCategory.OST_Mass
+
 fl_plan_type = database.get_view_family_types(DB.ViewFamily.FloorPlan, revit.doc)[0]
+# print (ui.titleblock_dict.values())
+# print (ui.titleblock_dict[ui.titleblock])
+#
+# print (ui.view_temp_dict.values())
+# print (ui.view_temp_dict[ui.viewplan])
+# print (ui.view_temp_dict[ui.viewkeyplan])
+#
+# print (ui.viewport_dict)
+# print (ui.viewport_dict[ui.viewport])
+#
+# print (ui.schedule_dict)
+# print (ui.schedule_dict[ui.schedule])
 
+def key_or_none (dict, key):
+    try:
+        v = dict[key]
+        return v
+    except:
+        return None
 
+def_tb = key_or_none(ui.titleblock_dict, ui.titleblock)
+print (def_tb)
+def_vt_layout = key_or_none(ui.view_temp_dict, ui.viewplan)
+def_vt_keyplan = key_or_none(ui.titleblock_dict, ui.viewkeyplan)
+def_viewport = key_or_none(ui.viewport_dict, ui.viewport)
+def_sh = key_or_none(ui.schedule_dict, ui.schedule)
 
 # select masses
-selection = select.select_with_cat_filter(cat, "Select a Mass")
-
+selection = select.select_with_cat_filter(category, "Select a Mass")
+# only get unique types (unique values of the chosen Mass parameter)
 unique_types = {}
 for m in selection:
     v = m.get_Parameter(chosen_massparam).AsString()
-
     if v and v not in unique_types.keys():
         unique_types[v] = m
 
-def_tb = database.tb_name_match(ui.titleblock)
-print (def_tb)
+
 components2 = [
     Label("Select Titleblock"),
-    ComboBox(name="tb", options=sorted(ui.titleblock_dict), default=database.tb_name_match(ui.titleblock)),
+    # ComboBox(name="tb", options=sorted(ui.titleblock_dict.values())),
+    ComboBox(name="tb", options=sorted(ui.titleblock_dict.values()), default=def_tb),
     Label("Sheet Number"),
     TextBox("sheet_number", Text=ui.sheet_number),
     Label("Crop offset [mm]"),
     TextBox("crop_offset", Text=str(ui.crop_offset)),
     Separator(),
     Label("View Template for Layout"),
-    ComboBox(name="vt_layout", options=sorted(ui.vt_layout_dict),
-             default=database.vt_name_match(ui.viewplan)),
+    ComboBox(name="vt_layout", options=sorted(ui.view_temp_dict.values()),
+             default=def_vt_layout),
     Label("View Template for Key Plans"),
-    ComboBox(name="vt_keyplan", options=sorted(ui.vt_layout_dict),
-             default=database.vt_name_match(ui.viewkeyplan)),
+    ComboBox(name="vt_keyplan", options=sorted(ui.view_temp_dict.values()),
+             default=def_vt_keyplan),
     Label("Viewport Type"),
-    ComboBox(name="vp_types", options=sorted(ui.viewport_dict), default=database.vp_name_match(ui.viewport)),
+    # ComboBox(name="vp_types", options=sorted(ui.viewport_dict.values())),
+    ComboBox(name="vp_types", options=sorted(ui.viewport_dict.values()), default=def_viewport),
     Separator(),
     Label("Area Schedule Template"),
-    ComboBox(name="area_sh", options=sorted(sh_dict), default=database.sh_name_match(ui.schedule)),
+    # ComboBox(name="area_sh", options=sorted(ui.schedule_dict.values())),
+    ComboBox(name="area_sh", options=sorted(ui.schedule_dict.values()), default=def_sh),
 
     Separator(),
     Button("Select"),
@@ -109,23 +143,27 @@ ok2 = form2.show()
 if ok2:
     # match the variables with user input
     chosen_sheet_nr = form2.values["sheet_number"]
-    chosen_vt_layout = ui.vt_layout_dict[form2.values["vt_layout"]]
-    chosen_vt_keyplan = ui.vt_layout_dict[form2.values["vt_keyplan"]]
-    chosen_tb = ui.titleblock_dict[form2.values["tb"]]
-    chosen_vp_type = ui.viewport_dict[form2.values["vp_types"]]
-    chosen_crop_offset = units.correct_input_units(form2.values["crop_offset"], revit.doc)
-    chosen_area_sh = ui.schedule_dict[form2.values["area_sh"]]
+    chosen_vt_layout_id = database.key_by_val(ui.view_temp_dict, form2.values["vt_layout"])
+    chosen_vt_keyplan_id = database.key_by_val(ui.view_temp_dict, form2.values["vt_keyplan"])
+    # chosen_vt_keyplan = ui.view_temp_dict[form2.values["vt_keyplan"]]
+    # chosen_tb = ui.titleblock_dict[form2.values["tb"]]
+    # chosen_vp_type = ui.viewport_dict[form2.values["vp_types"]]
+    # chosen_crop_offset = units.correct_input_units(form2.values["crop_offset"], revit.doc)
+    # chosen_area_sh = ui.schedule_dict[form2.values["area_sh"]]
+    chosen_tb_id = database.key_by_val(ui.titleblock_dict, form2.values["tb"])
+    chosen_vp_type_id = database.key_by_val(ui.viewport_dict, form2.values["vp_types"])
+    chosen_crop_offset_id = units.correct_input_units(form2.values["crop_offset"], revit.doc)
+    chosen_area_sh_id = database.key_by_val(ui.schedule_dict,form2.values["area_sh"])
 else:
     sys.exit()
 
 ui.set_config("sheet_number", chosen_sheet_nr)
 ui.set_config("crop_offset", form2.values["crop_offset"])
-ui.set_config("titleblock", form2.values["tb"])
-ui.set_config("viewplan", form2.values["vt_layout"])
-ui.set_config("viewkeyplan", form2.values["vt_keyplan"])
-ui.set_config("schedule", form2.values["area_sh"])
+ui.set_config("titleblock", chosen_tb_id)
+ui.set_config("viewplan", chosen_vt_layout_id)
+ui.set_config("viewkeyplan", chosen_vt_keyplan_id)
+ui.set_config("schedule", chosen_area_sh_id)
 
-sys.exit()
 all_mass = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Mass).WhereElementIsNotElementType().ToElements()
 
 all_view_filters = DB.FilteredElementCollector(revit.doc).OfClass(DB.FilterElement).ToElements()
@@ -200,14 +238,15 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         for k in key_plans:
             keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(key_plans[k]).Name
             k.Name = database.unique_view_name(keyplan_name, suffix=" Key Plan")
-            database.apply_vt(k, chosen_vt_keyplan)
+            database.apply_vt(k, revit.doc.GetElement(DB.ElementId(chosen_vt_keyplan_id)))
 
         # apply view template
-        database.apply_vt(layout_plan, chosen_vt_layout)
+        database.apply_vt(layout_plan, revit.doc.GetElement(DB.ElementId(chosen_vt_layout_id)))
 
 
         # duplicate template schedule
-        area_schedule_id = chosen_area_sh.Duplicate(DB.ViewDuplicateOption.Duplicate)
+        schedule_template = revit.doc.GetElement(DB.ElementId(chosen_area_sh_id))
+        area_schedule_id = schedule_template.Duplicate(DB.ViewDuplicateOption.Duplicate)
         area_schedule = revit.doc.GetElement(area_schedule_id)
 
 
@@ -240,7 +279,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         tds.SetCellText(0, 0, database.unique_view_name(string_value_type, suffix=" Area Schedule"))
         area_schedule.Name = database.unique_schedule_name(string_value_type, suffix=" Mass Schedule")
         # create sheet
-        sheet = database.create_sheet(chosen_sheet_nr, layout_name, chosen_tb.Id)
+        sheet = database.create_sheet(chosen_sheet_nr, layout_name, DB.ElementId(chosen_tb_id))
 
         # get positions on sheet
         loc = locator.Locator(sheet, 5.1, 'Vertical', 'Tiles')
@@ -257,7 +296,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
 
         # new: change viewport types
         for vp in [place_layout] + place_keyplan:
-            vp.ChangeTypeId(chosen_vp_type.Id)
+            vp.ChangeTypeId(DB.ElementId(chosen_vp_type_id))
 
         revit.doc.Regenerate()
 

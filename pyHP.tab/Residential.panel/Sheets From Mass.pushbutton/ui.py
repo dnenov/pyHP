@@ -3,29 +3,25 @@ class UI:
         self.script = script
         self.config = script.get_config()
         self.titleblock_dict = {}
-        self.vt_layout_dict = {}
-        # self.viewsection_dict = {}
+        self.view_temp_dict = {}
         self.viewport_dict = {}
         self.massparam_dict = {}
         self.schedule_dict = {}
         self.sheet_number = self.config.get_option('sheet_number', '1000')
         self.crop_offset = self.config.get_option('crop_offset', '350')
-        # self.massparam = None
-        # self.massparam = self.config.get_option('massparam', self.massparam_dict)
-        # self.viewport = self.config.get_option('viewport', self.viewport_dict)
-        # self.titleblock = self.config.get_option('titleblock', self.titleblock_dict)
-        # self.schedule_dict = self.config.get_option('schedule', self.schedule_dict)
+        self.massparam = None
 
     def set_massparam(self):
-        self.massparam = self.config.get_option('massparam', None)
+        self.massparam = self.config.get_option('massparam', list(self.massparam_dict.keys())[0])
+        # self.massparam = {0:1}
 
     def set_viewtemplates(self):
-        self.viewplan = self.config.get_option('viewplan', "<None>")
-        self.viewkeyplan = self.config.get_option('viewkeyplan', "<None>")
+        self.viewplan = self.config.get_option('viewplan', list(self.view_temp_dict.keys())[0])
+        self.viewkeyplan = self.config.get_option('viewkeyplan', list(self.view_temp_dict.keys())[0])
 
     def set_titleblocks(self):
         # set default
-        self.titleblock = self.config.get_option('titleblock', None)
+        self.titleblock = self.config.get_option('titleblock', list(self.titleblock_dict.keys())[0])
 
     def set_vp_types(self):
         # set default
@@ -46,8 +42,6 @@ class UI:
             self.config.viewplan = val
         if var == "viewkeyplan":
             self.config.viewkeyplan = val
-        if var == "viewsection":
-            self.config.viewsection = val
         if var == "viewport":
             self.config.viewport = val
         if var == "massparam":
