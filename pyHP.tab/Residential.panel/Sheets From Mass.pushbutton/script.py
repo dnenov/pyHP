@@ -203,7 +203,6 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         # sort key plans by level:
         kp_list = sorted(key_plans.items(), key=lambda x: revit.doc.GetElement(x[1]).Elevation, reverse=True)
         sorted_key_plans = dict(kp_list)
-        print (sorted_key_plans)
         for k in sorted_key_plans:
             keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(sorted_key_plans[k]).Name
             k.Name = database.unique_view_name(keyplan_name, suffix=" Key Plan")
