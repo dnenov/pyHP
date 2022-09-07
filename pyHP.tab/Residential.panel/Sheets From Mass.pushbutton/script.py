@@ -200,8 +200,12 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         layout_name = "Layout - " + layout_type_name
         layout_plan.Name = database.unique_view_name(layout_name, suffix=" Plan")
 
-        for k in key_plans:
-            keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(key_plans[k]).Name
+        # sort key plans by level:
+        kp_list = sorted(key_plans.items(), key=lambda x: revit.doc.GetElement(x[1]).Elevation, reverse=True)
+        sorted_key_plans = dict(kp_list)
+        print (sorted_key_plans)
+        for k in sorted_key_plans:
+            keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(sorted_key_plans[k]).Name
             k.Name = database.unique_view_name(keyplan_name, suffix=" Key Plan")
             database.apply_vt(k, revit.doc.GetElement(DB.ElementId(chosen_vt_keyplan_id)))
 
@@ -246,7 +250,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         sheet = database.create_sheet(chosen_sheet_nr, layout_name, DB.ElementId(chosen_tb_id))
 
         # get positions on sheet
-        loc = locator.Locator(sheet, chosen_crop_offset, 'Vertical', 'Tiles', len(key_plans))
+        loc = locator.Locator(sheet, chosen_crop_offset, 'Vertical', 'Tiles', len(sorted_key_plans))
         layout_position = loc.plan
         sh_position = loc.sh
         keyplan_positions = loc.keyplans
@@ -257,7 +261,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         # place view on sheet
         place_layout = DB.Viewport.Create(revit.doc, sheet.Id, layout_plan.Id, layout_position)
         place_area_sh = DB.ScheduleSheetInstance.Create(revit.doc, sheet.Id, area_schedule.Id, layout_position)
-        for pos, kp in izip(keyplan_positions, key_plans):
+        for pos, kp in izip(keyplan_positions, sorted_key_plans):
             place_keyplan = DB.Viewport.Create(revit.doc, sheet.Id, kp.Id, pos)
             kps.append(place_keyplan)
         # for kp in key_plans:
