@@ -12,8 +12,7 @@ class UI:
         self.massparam = None
 
     def set_massparam(self):
-        self.massparam = self.config.get_option('massparam', list(self.massparam_dict.keys())[0])
-        # self.massparam = {0:1}
+        self.massparam = self.config.get_option('massparam', list(self.massparam_dict.values())[0])
 
     def set_viewtemplates(self):
         self.viewplan = self.config.get_option('viewplan', list(self.view_temp_dict.keys())[0])
