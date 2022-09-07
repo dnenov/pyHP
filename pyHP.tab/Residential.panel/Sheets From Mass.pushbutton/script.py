@@ -146,6 +146,7 @@ def create_filter_from_rules(rules):
 
 with revit.Transaction("Create Flat Type Sheets", revit.doc):
     for layout_type_name in unique_types:
+
         fam_instance = unique_types[layout_type_name]
         level = fam_instance.Host
         layout_plan = DB.ViewPlan.Create(revit.doc, fl_plan_type.Id, level.Id)
@@ -158,6 +159,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
                 if isinstance(host, DB.Level):
                     all_levels_with_same_layout.append(host.Id)
 
+        # create a filter for masses of the same unit type
         layout_filter_id = None
         filter_name = "Mass - "+ layout_type_name
         for f in all_view_filters:
@@ -202,6 +204,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
 
         # sort key plans by level:
         kp_list = sorted(key_plans.items(), key=lambda x: revit.doc.GetElement(x[1]).Elevation, reverse=True)
+
         sorted_key_plans = dict(kp_list)
         for k in sorted_key_plans:
             keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(sorted_key_plans[k]).Name
@@ -256,7 +259,6 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
 
         # collect all key plans
         kps = []
-
         # place view on sheet
         place_layout = DB.Viewport.Create(revit.doc, sheet.Id, layout_plan.Id, layout_position)
         place_area_sh = DB.ScheduleSheetInstance.Create(revit.doc, sheet.Id, area_schedule.Id, layout_position)
@@ -266,7 +268,6 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         # for kp in key_plans:
         #     place_keyplan = DB.Viewport.Create(revit.doc, sheet.Id, kp.Id, keyplan_position)
         #     kp.ChangeTypeId(chosen_vp_type.Id)
-
         # new: change viewport types
         for vp in [place_layout] + kps:
             vp.ChangeTypeId(DB.ElementId(chosen_vp_type_id))

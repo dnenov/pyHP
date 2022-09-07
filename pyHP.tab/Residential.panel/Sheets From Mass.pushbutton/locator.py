@@ -25,7 +25,7 @@ class Locator:
         if layout == 'Tiles':            
             self.plan = (pos[14] + pos[20])/2
             self.sh = pos[16]
-            self.keyplans = [pos[i] for i in range(self.kp-1)]
+            self.keyplans = [pos[i] for i in range(self.kp)]
 
         elif layout == 'Cross':            
             self.plan = pos[4]
