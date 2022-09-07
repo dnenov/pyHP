@@ -205,7 +205,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
         sorted_key_plans = dict(kp_list)
         for k in sorted_key_plans:
             keyplan_name = "Key Plan - " + layout_type_name + " - " + revit.doc.GetElement(sorted_key_plans[k]).Name
-            k.Name = database.unique_view_name(keyplan_name, suffix=" Key Plan")
+            k.Name = database.unique_view_name(keyplan_name, suffix="")
             database.apply_vt(k, revit.doc.GetElement(DB.ElementId(chosen_vt_keyplan_id)))
 
         # apply view template
