@@ -65,7 +65,7 @@ fl_plan_type = database.get_view_family_types(DB.ViewFamily.FloorPlan, revit.doc
 
 def_tb = key_or_none(ui.titleblock_dict, ui.titleblock)
 def_vt_layout = key_or_none(ui.view_temp_dict, ui.viewplan)
-def_vt_keyplan = key_or_none(ui.titleblock_dict, ui.viewkeyplan)
+def_vt_keyplan = key_or_none(ui.view_temp_dict, ui.viewkeyplan)
 def_viewport = key_or_none(ui.viewport_dict, ui.viewport)
 def_sh = key_or_none(ui.schedule_dict, ui.schedule)
 
@@ -126,6 +126,7 @@ ui.set_config("crop_offset", form2.values["crop_offset"])
 ui.set_config("titleblock", chosen_tb_id)
 ui.set_config("viewplan", chosen_vt_layout_id)
 ui.set_config("viewkeyplan", chosen_vt_keyplan_id)
+ui.set_config("viewport", chosen_vp_type_id)
 ui.set_config("schedule", chosen_area_sh_id)
 
 all_mass = DB.FilteredElementCollector(revit.doc).OfCategory(DB.BuiltInCategory.OST_Mass).WhereElementIsNotElementType().ToElements()
@@ -158,7 +159,7 @@ with revit.Transaction("Create Flat Type Sheets", revit.doc):
                     all_levels_with_same_layout.append(host.Id)
 
         layout_filter_id = None
-        filter_name = "Mass_"+ layout_type_name
+        filter_name = "Mass - "+ layout_type_name
         for f in all_view_filters:
             if str(f.Name) == str(filter_name):
                 layout_filter_id = f.Id
