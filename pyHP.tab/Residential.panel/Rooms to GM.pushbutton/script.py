@@ -56,10 +56,10 @@ if selection:
     gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
     # construct rwp UI
     components = [
-        Label("[Department] Match Room parameters:"),
-        ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
-        Label("[Description] to Generic Model parameters:"),
-        ComboBox("gm_combobox1", gm_dict1, default="Description"),
+        # Label("[Department] Match Room parameters:"),
+        # ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
+        # Label("[Description] to Generic Model parameters:"),
+        # ComboBox("gm_combobox1", gm_dict1, default="Description"),
         Label("[Unit Area] parameter:"),
         ComboBox("gm_combobox2", gm_dict2),
         Button("Select")]
@@ -67,8 +67,8 @@ if selection:
     ok = form.show()
     if ok:
         # assign chosen parameters
-        chosen_room_param1 = form.values["room_combobox1"]
-        chosen_gm_param1 = form.values["gm_combobox1"]
+        # chosen_room_param1 = form.values["room_combobox1"]
+        # chosen_gm_param1 = form.values["gm_combobox1"]
         chosen_gm_param2 = form.values["gm_combobox2"]
     else:
         sys.exit()
@@ -97,9 +97,10 @@ if selection:
         if not project_number:
             project_number = "H&P"
         # Department:
-        dept = room.LookupParameter(chosen_room_param1).AsString()  # chosen parameter for Department
-        if not dept:
-            dept = "Unit"
+        # dept = room.LookupParameter("Department").AsString()  # chosen parameter for Department
+        dept = "Flat"  # chosen parameter for Department
+        # if not dept:
+        #     dept = "Unit"
         # Room name:
         room_name = room.get_Parameter(DB.BuiltInParameter.ROOM_NAME).AsString()
 
@@ -154,7 +155,7 @@ if selection:
                     fam_symbol.Activate()
                     revit.doc.Regenerate()
 
-                fam_symbol.LookupParameter(chosen_gm_param1.Definition.Name).Set(dept)
+                fam_symbol.LookupParameter("Description").Set(dept)
                 fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(unit_area)
 
                 # place family symbol at position
