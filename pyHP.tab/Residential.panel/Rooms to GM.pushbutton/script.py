@@ -30,6 +30,17 @@ if pre_selection and forms.alert("You have selected {} elements. Do you want to 
 else:
     selection = helper.select_rooms_filter()
 
+# test
+def get_external_definition_by_name(name):
+    sparam_file = HOST_APP.app.OpenSharedParameterFile()
+    for def_groups in sparam_file.Groups:
+        for sparam_def in def_groups.Definitions:
+            if sparam_def.Name==name:
+                return sparam_def
+
+
+
+
 if selection:
     # Create family doc from template
     # get file template from location
@@ -139,6 +150,27 @@ if selection:
                 placement_point = room.Location.Point
             except Exception as err:
                     logger.error(err)
+
+
+            # parameter definition
+            external_parameter_definition = get_external_definition_by_name("Unit Area")
+            builtin_param_group = DB.BuiltInParameterGroup.PG_TEXT
+            is_instance_parameter = False
+
+            # create new family parameter
+            unit_area_parameter = new_family_doc.FamilyManager.AddParameter(external_parameter_definition,
+                                                      builtin_param_group,
+                                                      is_instance_parameter)
+
+            unit_area_instance_parameter = new_family_doc.FamilyManager.AddParameter(
+                get_external_definition_by_name("Unit Area Instance"),
+                builtin_param_group,
+                True
+            )
+
+            if unit_area_instance_parameter.CanAssignFormula:
+                new_family_doc.FamilyManager.NewType("new")
+                new_family_doc.FamilyManager.SetFormula(unit_area_instance_parameter, "Unit Area")
 
         # save and close family
         save_opt = DB.SaveOptions()
