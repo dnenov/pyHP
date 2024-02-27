@@ -53,36 +53,36 @@ if selection:
                         p.StorageType.ToString() == "String" and p.IsReadOnly == False]
     # collect and organize Generic Model parameters: (only editable text type params)
     gm_parameter_set = helper.param_set_by_cat(DB.BuiltInCategory.OST_GenericModel)
-    gm_params_text = [p for p in gm_parameter_set if p.StorageType.ToString() == "String"]
-    gm_params_area = [p for p in gm_parameter_set if p.Definition.ParameterType.ToString()=="Area"]
+    # gm_params_text = [p for p in gm_parameter_set if p.StorageType.ToString() == "String"]
+    # gm_params_area = [p for p in gm_parameter_set if p.Definition.ParameterType.ToString()=="Area"]
 
-    if not gm_params_area:
-        forms.alert(msg="No suitable parameter",
-                    sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit "
-                            "Area' of Area Type. The Unit Area parameter must be a Type parameter.",
-                    ok=True,
-                    warn_icon=True, exitscript=True)
-
-    gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
-    gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
+    # if not gm_params_area:
+    #     forms.alert(msg="No suitable parameter",
+    #                 sub_msg="There is no suitable parameter to use for Unit Area. Please add a shared parameter 'Unit "
+    #                         "Area' of Area Type. The Unit Area parameter must be a Type parameter.",
+    #                 ok=True,
+    #                 warn_icon=True, exitscript=True)
+    #
+    # gm_dict1 = {p.Definition.Name: p for p in gm_params_text}
+    # gm_dict2 = {p.Definition.Name: p for p in gm_params_area}
     # construct rwp UI
-    components = [
-        # Label("[Department] Match Room parameters:"),
-        # ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
-        # Label("[Description] to Generic Model parameters:"),
-        # ComboBox("gm_combobox1", gm_dict1, default="Description"),
-        Label("[Unit Area] parameter:"),
-        ComboBox("gm_combobox2", gm_dict2),
-        Button("Select")]
-    form = FlexForm("Match parameters", components)
-    ok = form.show()
-    if ok:
-        # assign chosen parameters
-        # chosen_room_param1 = form.values["room_combobox1"]
-        # chosen_gm_param1 = form.values["gm_combobox1"]
-        chosen_gm_param2 = form.values["gm_combobox2"]
-    else:
-        sys.exit()
+    # components = [
+    #     # Label("[Department] Match Room parameters:"),
+    #     # ComboBox(name="room_combobox1", options=room_params_text, default="Department"),
+    #     # Label("[Description] to Generic Model parameters:"),
+    #     # ComboBox("gm_combobox1", gm_dict1, default="Description"),
+    #     Label("[Unit Area] parameter:"),
+    #     ComboBox("gm_combobox2", gm_dict2),
+    #     Button("Select")]
+    # form = FlexForm("Match parameters", components)
+    # ok = form.show()
+    # if ok:
+    #     # assign chosen parameters
+    #     # chosen_room_param1 = form.values["room_combobox1"]
+    #     # chosen_gm_param1 = form.values["gm_combobox1"]
+    #     chosen_gm_param2 = form.values["gm_combobox2"]
+    # else:
+    #     sys.exit()
 
 
     # iterate through rooms
@@ -117,6 +117,8 @@ if selection:
 
         # Room area:
         unit_area = room.get_Parameter(DB.BuiltInParameter.ROOM_AREA).AsDouble()
+        if unit_area == 0:
+            continue
 
         # Room number (to be used as layout type differentiation)
         room_number = room.get_Parameter(DB.BuiltInParameter.ROOM_NUMBER).AsString()
@@ -145,11 +147,12 @@ if selection:
         # Create extrusion from room boundaries
         with revit.Transaction(doc=new_family_doc, name="Create Extrusion"):
             try:
-                extrusion = helper.room_to_extrusion(room, new_family_doc)
+                extrusion = helper.room_to_extrusion(room, new_family_doc,output)
                 helper.assign_material_param(extrusion, sp_unit_material, new_family_doc)
                 placement_point = room.Location.Point
             except Exception as err:
                     logger.error(err)
+                    continue
 
 
             # parameter definition
@@ -188,7 +191,7 @@ if selection:
                     revit.doc.Regenerate()
 
                 fam_symbol.LookupParameter("Description").Set(dept)
-                fam_symbol.LookupParameter(chosen_gm_param2.Definition.Name).Set(unit_area)
+                fam_symbol.LookupParameter("Unit Area").Set(unit_area)
 
                 # place family symbol at position
                 new_fam_instance = revit.doc.Create.NewFamilyInstance(placement_point, fam_symbol,

@@ -9,7 +9,8 @@ BIC = DB.BuiltInCategory
 doc = revit.doc
 active_view = revit.active_view
 output = script.get_output()
-
+HABITABLE_ROOMS_PARAMETER_NAME = "Habitable Rooms"
+TENURE_PARAMETER_NAME = "Tenure"
 
 # get the design option of the active view
 def get_design_option_of_view(view):
@@ -26,12 +27,22 @@ one_visible_unit = get_design_option_of_view(active_view)
 design_option = one_visible_unit.DesignOption
 
 collect_all_units = FEC(doc).OfCategory(BIC.OST_GenericModel).WhereElementIsNotElementType().ToElements()
+units_of_active_design_option = []
 
-units_of_active_design_option = [unit for unit in collect_all_units if unit.DesignOption.Id == design_option.Id]
+# iterate through all units and gather all units matching the design option
+for unit in collect_all_units:
+    try:
+        if unit.DesignOption.Id == design_option.Id:
+            units_of_active_design_option.append(unit)
+    except AttributeError:
+        pass
+
 
 if len (units_of_active_design_option) == 0:
     output.print_md("Zero units found")
     sys.exit()
+
+
 
 # counters
 private_hab_rooms = 0
@@ -41,8 +52,8 @@ social_hab_rooms = 0
 for unit in units_of_active_design_option:
     unit_type = doc.GetElement(unit.GetTypeId())
     try:
-        tenure = unit_type.LookupParameter("Tenure").AsValueString()
-        hab_rooms = unit_type.LookupParameter("Habitable Rooms").AsValueString()
+        tenure = unit_type.LookupParameter(TENURE_PARAMETER_NAME).AsValueString()
+        hab_rooms = unit_type.LookupParameter(HABITABLE_ROOMS_PARAMETER_NAME).AsValueString()
 
         if tenure == "Private":
             private_hab_rooms += int(hab_rooms)
@@ -70,6 +81,8 @@ social_colour = "#FFA037"
 
 output.print_md("# Units Mix - Option {}".format(design_option.Name))
 output.print_md("--------")
+output.print_md("Total units in option - {}".format(len(units_of_active_design_option)))
+
 
 # Private / Affordable split
 chartPrivateAffordable = output.make_doughnut_chart()

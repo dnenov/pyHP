@@ -152,7 +152,7 @@ def get_family_slow_way(name):
                 return el
 
 
-def room_to_extrusion(r, family_doc):
+def room_to_extrusion(r, family_doc,output):
     # room_height = r.get_Parameter(DB.BuiltInParameter.ROOM_HEIGHT).AsDouble()
     room_height = convert_length_to_internal(2500)
     # helper: define inverted transform to translate room geometry to origin
