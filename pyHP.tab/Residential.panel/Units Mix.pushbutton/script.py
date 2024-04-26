@@ -1,7 +1,4 @@
 from pyrevit import revit, DB, script, forms, HOST_APP
-from rpw.ui.forms import (FlexForm, Label, ComboBox, Separator, Button)
-import tempfile
-import re
 import sys
 
 FEC = DB.FilteredElementCollector
@@ -12,16 +9,19 @@ output = script.get_output()
 HABITABLE_ROOMS_PARAMETER_NAME = "Habitable Rooms"
 TENURE_PARAMETER_NAME = "Tenure"
 
+
 # get the design option of the active view
 def get_design_option_of_view(view):
-    units_in_view = FEC(doc, active_view.Id).OfCategory(BIC.OST_GenericModel).WhereElementIsNotElementType().ToElements()
+    units_in_view = FEC(doc, active_view.Id).OfCategory(
+        BIC.OST_GenericModel).WhereElementIsNotElementType().ToElements()
     for unit in units_in_view:
         try:
-            tenure = doc.GetElement(unit.GetTypeId()).LookupParameter("Tenure").AsValueString()
-            if tenure:
+            description_parameter = doc.GetElement(unit.GetTypeId()).get_Parameter(DB.BuiltInParameter.ALL_MODEL_DESCRIPTION).AsValueString()
+            if description_parameter == "Flat":
                 return unit
         except:
             return None
+
 
 one_visible_unit = get_design_option_of_view(active_view)
 design_option = one_visible_unit.DesignOption
@@ -37,12 +37,9 @@ for unit in collect_all_units:
     except AttributeError:
         pass
 
-
-if len (units_of_active_design_option) == 0:
+if len(units_of_active_design_option) == 0:
     output.print_md("Zero units found")
     sys.exit()
-
-
 
 # counters
 private_hab_rooms = 0
@@ -68,11 +65,10 @@ for unit in units_of_active_design_option:
 affordable_room_count = social_hab_rooms + shared_hab_rooms
 total_room_count = private_hab_rooms + affordable_room_count
 
-
-private_percent = float(private_hab_rooms* 100.0/total_room_count)
-affordable_percent = float(affordable_room_count* 100.0/total_room_count)
-shared_percent = float(shared_hab_rooms* 100.0/affordable_room_count)
-social_percent = float(social_hab_rooms* 100.0/affordable_room_count)
+private_percent = float(private_hab_rooms * 100.0 / total_room_count)
+affordable_percent = float(affordable_room_count * 100.0 / total_room_count)
+shared_percent = float(shared_hab_rooms * 100.0 / affordable_room_count)
+social_percent = float(social_hab_rooms * 100.0 / affordable_room_count)
 
 private_colour = "#7E95B3"
 affordable_colour = "#B3B133"
@@ -82,7 +78,6 @@ social_colour = "#FFA037"
 output.print_md("# Units Mix - Option {}".format(design_option.Name))
 output.print_md("--------")
 output.print_md("Total units in option - {}".format(len(units_of_active_design_option)))
-
 
 # Private / Affordable split
 chartPrivateAffordable = output.make_doughnut_chart()
@@ -97,11 +92,10 @@ chartPrivateAffordable.options.legend = {"position": "left", "fullWidth": False}
 chartPrivateAffordable.data.labels = ["Private", "Affordable"]
 dataset = chartPrivateAffordable.data.new_dataset("Not Standard")
 
-dataset.data = [private_hab_rooms, shared_hab_rooms+social_hab_rooms]
+dataset.data = [private_hab_rooms, shared_hab_rooms + social_hab_rooms]
 dataset.backgroundColor = [private_colour, affordable_colour]
 chartPrivateAffordable.set_height = 1
 chartPrivateAffordable.draw()
-
 
 output.print_md(" . . . . . Habitable Rooms | Percent")
 output.print_md("Private . . . . . . . . {} | {:.2f} %".format(private_hab_rooms, private_percent))
@@ -128,7 +122,9 @@ chartAffordableSplit.set_height = 1
 chartAffordableSplit.draw()
 
 output.print_md(". . . . . . . . . .Habitable Rooms     |         Percent")
-output.print_md("Shared Ownership. . . . . . . . {}            |            {:.2f} %".format(shared_hab_rooms, shared_percent))
-output.print_md("Social Rent . . . . . . . . . . {}            |            {:.2f} %".format(str(social_hab_rooms), social_percent))
+output.print_md(
+    "Shared Ownership. . . . . . . . {}            |            {:.2f} %".format(shared_hab_rooms, shared_percent))
+output.print_md(
+    "Social Rent . . . . . . . . . . {}            |            {:.2f} %".format(str(social_hab_rooms), social_percent))
 output.print_md("TOTALS . . . . . . . . {}".format(affordable_room_count))
 output.print_md("--------")
