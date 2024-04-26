@@ -9,6 +9,10 @@ output = script.get_output()
 HABITABLE_ROOMS_PARAMETER_NAME = "Habitable Rooms"
 TENURE_PARAMETER_NAME = "Tenure"
 
+def get_description(element):
+    description = doc.GetElement(element.GetTypeId()).get_Parameter(DB.BuiltInParameter.ALL_MODEL_DESCRIPTION).AsValueString()
+    return description
+
 
 # get the design option of the active view
 def get_design_option_of_view(view):
@@ -16,8 +20,7 @@ def get_design_option_of_view(view):
         BIC.OST_GenericModel).WhereElementIsNotElementType().ToElements()
     for unit in units_in_view:
         try:
-            description_parameter = doc.GetElement(unit.GetTypeId()).get_Parameter(DB.BuiltInParameter.ALL_MODEL_DESCRIPTION).AsValueString()
-            if description_parameter == "Flat":
+            if get_description(unit) == "Flat":
                 return unit
         except:
             return None
@@ -32,7 +35,7 @@ units_of_active_design_option = []
 # iterate through all units and gather all units matching the design option
 for unit in collect_all_units:
     try:
-        if unit.DesignOption.Id == design_option.Id:
+        if unit.DesignOption.Id == design_option.Id and get_description(unit):
             units_of_active_design_option.append(unit)
     except AttributeError:
         pass
