@@ -14,7 +14,12 @@ output = script.get_output()
 # get shared parameter for the extrusion material
 
 
-sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", DB.ParameterType.Material)
+if HOST_APP.is_newer_than(2022):
+    parameter_type = DB.SpecTypeId.Reference.Material
+else:
+    parameter_type = DB.ParameterType.Material
+
+sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", parameter_type)
 if not sp_unit_material:
     forms.alert(msg="No suitable parameter", \
         sub_msg="There is no suitable parameter to use for Unit Material. Please add a shared parameter 'Unit Material' of Material Type", \

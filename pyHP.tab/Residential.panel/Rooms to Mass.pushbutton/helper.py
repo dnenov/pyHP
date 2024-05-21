@@ -100,14 +100,16 @@ def get_fam(family_name):
     # get family symbol by family name, get any type
     fam_bip_id = DB.ElementId(DB.BuiltInParameter.SYMBOL_FAMILY_NAME_PARAM)
     fam_bip_provider = DB.ParameterValueProvider(fam_bip_id)
-    fam_filter_rule = DB.FilterStringRule(fam_bip_provider, DB.FilterStringEquals(), family_name, True)
+    if HOST_APP.is_newer_than(2022):
+        fam_filter_rule = DB.FilterStringRule(fam_bip_provider, DB.FilterStringEquals(), family_name)
+    else:
+        fam_filter_rule = DB.FilterStringRule(fam_bip_provider, DB.FilterStringEquals(), family_name, True)
     fam_filter = DB.ElementParameterFilter(fam_filter_rule)
 
     collector = DB.FilteredElementCollector(revit.doc) \
         .WherePasses(fam_filter) \
         .WhereElementIsElementType() \
         .FirstElement()
-
     return collector
 
 
@@ -118,8 +120,12 @@ def get_shared_param_by_name_type(sp_name, sp_type):
     try:
         for def_group in spf.Groups:
             for sp in def_group.Definitions:
-                if sp.Name == sp_name and sp.ParameterType == sp_type:
-                    return sp
+                if HOST_APP.is_newer_than(2022):
+                    if sp.Name == sp_name and sp.GetDataType().TypeId == sp_type.TypeId:
+                        return sp
+                else:
+                    if sp.Name == sp_name and sp.ParameterType == sp_type:
+                        return sp
         if not sp:
             forms.alert("Shared parameter not found", ok=True, warn_icon=True)
             return None
