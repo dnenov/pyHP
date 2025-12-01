@@ -68,6 +68,8 @@ if selected_option == "1. Load Family Parameters":
         if not area_def:
             forms.alert("'Unit Area Instance' shared parameter not found in shared parameter file.", title="Error")
             script.exit()
+        
+        output.print_md("**Shared parameter '{}' found in shared parameter file.**\n".format(AREA_PARAM_NAME))
     except Exception as e:
         forms.alert("Error accessing shared parameter file: {}".format(e), title="Error")
         script.exit()
@@ -115,47 +117,43 @@ if selected_option == "1. Load Family Parameters":
             families_skipped += 1
             continue
         
-        # Check for existing Unit Area Instance parameter and its group
+        # Check for existing Unit Area Instance parameter (any group)
         family_mgr = family_doc.FamilyManager
         existing_param = None
-        param_in_dimensions = False
+        param_in_general = False
         
         for param in family_mgr.Parameters:
             if param.Definition.Name == AREA_PARAM_NAME:
                 existing_param = param
-                # Check if it's in Dimensions/Geometry group
-                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GEOMETRY:
-                    param_in_dimensions = True
-                    output.print_md("  - Parameter already exists in Dimensions group\n")
+                # Check if it's in General group
+                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GENERAL:
+                    param_in_general = True
+                    output.print_md("  - Parameter already exists in General group\n")
                 else:
-                    output.print_md("  - Parameter exists in {} group, will be moved\n".format(param.Definition.ParameterGroup))
+                    output.print_md("  - Parameter exists in {} group, will be deleted and recreated\n".format(param.Definition.ParameterGroup))
                 break
         
         # Process family parameter
         try:
-            # Process family parameter
             t_family = DB.Transaction(family_doc, "Update Unit Area Instance Parameter")
             t_family.Start()
             
             try:
-                # If parameter exists but is in wrong group, delete it
-                if existing_param and not param_in_dimensions:
+                # Always delete existing parameter if it exists (regardless of group)
+                if existing_param:
                     family_mgr.RemoveParameter(existing_param)
-                    output.print_md("  - Removed parameter from wrong group\n")
-                    logger.debug("Removed Unit Area Instance from wrong group in family: {}".format(family.Name))
+                    output.print_md("  - Deleted existing parameter\n")
+                    logger.debug("Deleted existing Unit Area Instance parameter from family: {}".format(family.Name))
                 
-                # If parameter doesn't exist or was in wrong group, add it to Dimensions
-                if not param_in_dimensions:
-                    new_param = family_mgr.AddParameter(
-                        area_def,
-                        DB.BuiltInParameterGroup.PG_GEOMETRY,  # Dimensions/Geometry group
-                        True  # Instance parameter
-                    )
-                    output.print_md("  - Added parameter to Dimensions group\n")
-                    logger.debug("Added Unit Area Instance to Dimensions group in family: {}".format(family.Name))
-                    families_updated += 1
-                else:
-                    output.print_md("  - Parameter already in correct group, skipping\n")
+                # Always add parameter to General group (even if it was already there, we deleted it)
+                new_param = family_mgr.AddParameter(
+                    area_def,
+                    DB.BuiltInParameterGroup.PG_GENERAL,  # General group
+                    True  # Instance parameter
+                )
+                output.print_md("  - Added parameter to General group\n")
+                logger.debug("Added Unit Area Instance to General group in family: {}".format(family.Name))
+                families_updated += 1
                 
                 t_family.Commit()
                 
