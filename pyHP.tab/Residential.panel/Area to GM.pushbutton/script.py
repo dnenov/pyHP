@@ -5,11 +5,12 @@ __doc__ = "Calculate area of a Generic Model families. Carries over unit paramet
 # Area = Volume / Height (height from bounding box)
 # Does nothing if nothing is selected.
 
+
 from pyrevit import revit, DB, script
 
 doc = revit.doc
 uidoc = revit.uidoc
-app = revit.app
+app = revit.doc.Application  # Changed from revit.app
 logger = script.get_logger()
 output = script.get_output()
 
