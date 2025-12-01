@@ -9,7 +9,7 @@ app = revit.doc.Application
 logger = script.get_logger()
 output = script.get_output()
 
-AREA_PARAM_NAME = "Unit Area Instance"   # Shared parameter to add to family
+AREA_PARAM_NAME = "Unit Area Instance"   # Parameter name
 
 # Custom FamilyLoadOptions class for reloading families
 class SimpleLoadOptions(DB.IFamilyLoadOptions):
@@ -54,30 +54,7 @@ if selected_option == "1. Load Family Parameters":
     families_already_correct = 0
     error_messages = []
 
-    output.print_md("### Converting Unit Area Instance Parameter (Text to Area type, keep in Text group)\n")
-
-    # Get shared parameter file
-    spfile = app.OpenSharedParameterFile()
-    if not spfile:
-        forms.alert("No shared parameter file is loaded.\nSet it in Revit first (Manage > Shared Parameters).", 
-                    title="Error", exitscript=True)
-    
-    # Find Unit Area Instance parameter definition (must be Area type)
-    area_def = None
-    for group in spfile.Groups:
-        for defn in group.Definitions:
-            if defn.Name == AREA_PARAM_NAME:
-                area_def = defn
-                break
-        if area_def:
-            break
-    
-    if not area_def:
-        forms.alert("'Unit Area Instance' shared parameter not found in shared parameter file.\n\nMake sure it exists and is Area type (not Text).", 
-                    title="Error", exitscript=True)
-    
-    output.print_md("**Shared parameter '{}' found in shared parameter file.**\n".format(AREA_PARAM_NAME))
-    output.print_md("**Note: Converting from Text type to Area type, keeping in Text group.**\n")
+    output.print_md("### Converting Unit Area Instance to Area type in Text group\n")
 
     # Collect unique families from selection
     families = set()
@@ -107,7 +84,7 @@ if selected_option == "1. Load Family Parameters":
             continue
         
         try:
-            # Open family document using EditFamily
+            # Open family document
             family_doc = doc.EditFamily(family)
             family_mgr = family_doc.FamilyManager
             
@@ -117,76 +94,83 @@ if selected_option == "1. Load Family Parameters":
             existing_param = None
             existing_is_text_type = False
             existing_in_text_group = False
+            existing_is_area_type = False
+            existing_is_shared = False
             
             for param in family_mgr.Parameters:
                 if param.Definition.Name == AREA_PARAM_NAME:
                     existing_param = param
-                    # Check parameter type
-                    param_type = param.Definition.ParameterType
-                    if param_type == DB.ParameterType.Text:
-                        existing_is_text_type = True
-                    # Check if in Text group
-                    if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_TEXT:
-                        existing_in_text_group = True
+                    fam_param_type = param.Definition.ParameterType
+                    existing_is_text_type = (fam_param_type == DB.ParameterType.Text)
+                    existing_is_area_type = (fam_param_type == DB.ParameterType.Area)
+                    existing_in_text_group = (param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_TEXT)
+                    # Check if it's a shared parameter
+                    try:
+                        # Shared parameters have an ExternalDefinition
+                        if hasattr(param.Definition, 'GetExternalDefinition'):
+                            existing_is_shared = True
+                    except:
+                        pass
                     
-                    output.print_md("  - Found existing parameter: Type={}, Group={}\n".format(
-                        param_type, param.Definition.ParameterGroup))
+                    output.print_md("  - Found existing: Type={}, Group={}, Shared={}\n".format(
+                        fam_param_type, param.Definition.ParameterGroup, existing_is_shared))
                     break
             
-            # If parameter doesn't exist, add it
-            if not existing_param:
-                output.print_md("  - Parameter not found, adding new Area parameter in Text group\n")
-                t_family = DB.Transaction(family_doc, "Add Unit Area Instance Parameter")
-                t_family.Start()
-                try:
-                    new_param = family_mgr.AddParameter(
-                        area_def,
-                        DB.BuiltInParameterGroup.PG_TEXT,  # Text group
-                        True  # Instance parameter
-                    )
-                    t_family.Commit()
-                    families_updated += 1
-                    output.print_md("  - Added Area parameter to Text group\n")
-                except Exception as e:
+            # Start transaction
+            t_family = DB.Transaction(family_doc, "Update Unit Area Instance Parameter")
+            t_family.Start()
+            
+            try:
+                # If parameter exists and is already Area type in Text group, skip
+                if existing_param and existing_is_area_type and existing_in_text_group:
+                    output.print_md("  - Already correct (Area type in Text group), skipping\n")
                     t_family.RollBack()
-                    raise e
-            # If parameter exists and is already Area type in Text group, skip
-            elif not existing_is_text_type and existing_in_text_group:
-                output.print_md("  - Parameter already correct (Area type in Text group), skipping\n")
-                families_already_correct += 1
-                family_doc.Close(False)
-                continue
-            # If parameter exists but is wrong type or wrong group, replace it
-            else:
-                output.print_md("  - Converting parameter from Text to Area type, keeping in Text group\n")
-                t_family = DB.Transaction(family_doc, "Convert Unit Area Instance Parameter")
-                t_family.Start()
-                try:
-                    # Delete existing parameter
+                    families_already_correct += 1
+                    family_doc.Close(False)
+                    continue
+                
+                # Delete existing parameter if it exists (especially if Text type or shared)
+                if existing_param:
                     family_mgr.RemoveParameter(existing_param)
                     if existing_is_text_type:
-                        output.print_md("  - Deleted Text parameter\n")
+                        output.print_md("  - Deleted Text type parameter\n")
+                    elif existing_is_shared:
+                        output.print_md("  - Deleted shared parameter (will create Area family parameter)\n")
                     else:
-                        output.print_md("  - Deleted parameter (wrong group)\n")
-                    
-                    # Add new Area parameter in Text group
-                    new_param = family_mgr.AddParameter(
-                        area_def,
-                        DB.BuiltInParameterGroup.PG_TEXT,  # Text group
-                        True  # Instance parameter
-                    )
-                    output.print_md("  - Added Area parameter to Text group\n")
-                    t_family.Commit()
-                    families_updated += 1
-                except Exception as e:
-                    t_family.RollBack()
-                    raise e
-            
-            # Reload family into project
-            load_opt = SimpleLoadOptions()
-            family_doc.LoadFamily(doc, load_opt)
-            family_doc.Close(False)
-            output.print_md("  - Family reloaded into project\n")
+                        output.print_md("  - Deleted existing parameter\n")
+                
+                # Create new Area-type family parameter (not shared) in Text group
+                # We'll create it as a family parameter since we can't modify shared parameter file
+                param_def = family_mgr.AddParameter(
+                    AREA_PARAM_NAME,
+                    DB.BuiltInParameterGroup.PG_TEXT,  # Text group
+                    DB.ParameterType.Area,  # Area type
+                    True  # Instance parameter
+                )
+                
+                output.print_md("  - Created Area type family parameter in Text group\n")
+                logger.info("Created Area type parameter in family: {}".format(fam_name))
+                families_updated += 1
+                
+                t_family.Commit()
+                
+                # Reload family into project
+                load_opt = SimpleLoadOptions()
+                family_doc.LoadFamily(doc, load_opt)
+                family_doc.Close(False)
+                output.print_md("  - Family reloaded\n")
+                
+            except Exception as e:
+                t_family.RollBack()
+                error_msg = "Failed to update parameter in family {}: {}".format(fam_name, e)
+                output.print_md("**ERROR: {}**\n".format(error_msg))
+                logger.error(error_msg)
+                error_messages.append(error_msg)
+                families_skipped += 1
+                try:
+                    family_doc.Close(False)
+                except:
+                    pass
                 
         except Exception as e:
             error_msg = "Error processing family {}: {}".format(fam_name, e)
@@ -209,6 +193,9 @@ if selected_option == "1. Load Family Parameters":
         )
     )
     
+    output.print_md("\n**Note: Created as family parameters (not shared) with Area type in Text group.**\n")
+    output.print_md("**This will work for calculations and appear under Text in properties panel.**\n")
+    
     if error_messages:
         output.print_md("\n**Errors encountered:**\n")
         for err in error_messages:
@@ -220,7 +207,7 @@ if selected_option == "1. Load Family Parameters":
         "Families updated: {}\n"
         "Families already correct: {}\n"
         "Families skipped: {}\n\n"
-        "Check output panel for details.".format(
+        "Created as Area type family parameters in Text group.".format(
             len(families), families_updated, families_already_correct, families_skipped
         ),
         title="Load Family Parameters Complete"
