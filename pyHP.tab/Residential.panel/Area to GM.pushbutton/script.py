@@ -4,6 +4,7 @@ __doc__ = "Calculate area of a Generic Model families. Carries over unit paramet
 # Update Unit Area Instance from Volume for SELECTED Generic Models
 # Area = Volume / Height (height from bounding box)
 # Does nothing if nothing is selected.
+
 from pyrevit import revit, DB, script, forms
 import os
 
@@ -120,17 +121,11 @@ if selected_option == "1. Load Family Parameters":
         # Check for existing Unit Area Instance parameter (any group)
         family_mgr = family_doc.FamilyManager
         existing_param = None
-        param_in_general = False
         
         for param in family_mgr.Parameters:
             if param.Definition.Name == AREA_PARAM_NAME:
                 existing_param = param
-                # Check if it's in General group
-                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GENERAL:
-                    param_in_general = True
-                    output.print_md("  - Parameter already exists in General group\n")
-                else:
-                    output.print_md("  - Parameter exists in {} group, will be deleted and recreated\n".format(param.Definition.ParameterGroup))
+                output.print_md("  - Found existing parameter in {} group\n".format(param.Definition.ParameterGroup))
                 break
         
         # Process family parameter
@@ -145,7 +140,7 @@ if selected_option == "1. Load Family Parameters":
                     output.print_md("  - Deleted existing parameter\n")
                     logger.debug("Deleted existing Unit Area Instance parameter from family: {}".format(family.Name))
                 
-                # Always add parameter to General group (even if it was already there, we deleted it)
+                # Always add parameter to General group
                 new_param = family_mgr.AddParameter(
                     area_def,
                     DB.BuiltInParameterGroup.PG_GENERAL,  # General group
