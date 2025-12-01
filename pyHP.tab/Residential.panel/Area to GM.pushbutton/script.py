@@ -1,5 +1,5 @@
 __title__ = "Area to\n Generic Model"
-__doc__ = "Calculate area of Generic Model families. Make sure shared parameter Unit Area Instance is set to dimensions in the revit family and Formula tab is empty"
+__doc__ = "(Re)Calculate area of Generic Model families."
 
 from pyrevit import revit, DB, script, forms
 
@@ -8,7 +8,7 @@ uidoc = revit.uidoc
 logger = script.get_logger()
 output = script.get_output()
 
-AREA_PARAM_NAME = "Unit Area Instance"   # Parameter name
+AREA_PARAM_NAME = "Unit Area"   # Parameter name (type parameter)
 
 # Get selection
 selection_ids = list(uidoc.Selection.GetElementIds())
@@ -45,7 +45,14 @@ for elem in elems:
         continue
 
     vol_param = get_volume_param(elem)
-    area_param = elem.LookupParameter(AREA_PARAM_NAME)
+    
+    # Get element type for type parameter
+    elem_type = doc.GetElement(elem.GetTypeId())
+    if not elem_type:
+        skipped += 1
+        continue
+    
+    area_param = elem_type.LookupParameter(AREA_PARAM_NAME)
 
     if not vol_param or not area_param:
         skipped += 1
@@ -99,7 +106,7 @@ else:
         "No Generic Models were updated.\n\n"
         "Selected: {}\n"
         "Skipped: {}\n\n"
-        "Make sure you have selected Generic Model elements with volume and Unit Area Instance parameters.".format(
+        "Make sure you have selected Generic Model elements with volume and Unit Area (type parameter).".format(
             len(elems), skipped
         ),
         title="Area Calculation"
