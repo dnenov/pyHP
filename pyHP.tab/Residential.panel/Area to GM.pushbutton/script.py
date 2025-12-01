@@ -89,14 +89,14 @@ if selected_option == "1. Load Family Parameters":
         # Check for existing Unit Area Instance parameter and its group
         family_mgr = family_doc.FamilyManager
         existing_param = None
-        param_in_general = False
+        param_in_dimensions = False
         
         for param in family_mgr.Parameters:
             if param.Definition.Name == AREA_PARAM_NAME:
                 existing_param = param
-                # Check if it's in General group
-                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GENERAL:
-                    param_in_general = True
+                # Check if it's in Dimensions/Geometry group
+                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GEOMETRY:
+                    param_in_dimensions = True
                 break
         
         # Load shared parameter into family
@@ -131,18 +131,19 @@ if selected_option == "1. Load Family Parameters":
             
             try:
                 # If parameter exists but is in wrong group (Text or other), delete it
-                if existing_param and not param_in_general:
+                if existing_param and not param_in_dimensions:
                     family_mgr.RemoveParameter(existing_param)
                     logger.debug("Removed Unit Area Instance from wrong group in family: {}".format(family.Name))
                 
-                # If parameter doesn't exist or was in wrong group, add it to General
-                if not param_in_general:
+                # If parameter doesn't exist or was in wrong group, add it to Dimensions
+                if not param_in_dimensions:
                     new_param = family_mgr.AddParameter(
                         area_def,
-                        DB.BuiltInParameterGroup.PG_GENERAL,  # General group
+                        DB.BuiltInParameterGroup.PG_GEOMETRY,  # Dimensions/Geometry group
                         True  # Instance parameter
                     )
-                    logger.debug("Added Unit Area Instance to General group in family: {}".format(family.Name))
+                    logger.debug("Added Unit Area Instance to Dimensions group in family: {}".format(family.Name))
+                    families_updated += 1
                 
                 t_family.Commit()
                 
@@ -155,8 +156,6 @@ if selected_option == "1. Load Family Parameters":
                 reload_opts = DB.FamilyLoadOptions()
                 reload_opts.OnFamilyFound = DB.FamilyLoadOptions.OnFamilyFoundAction.UseExisting
                 doc.LoadFamily(family_path, reload_opts)
-                
-                families_updated += 1
                 
             except Exception as e:
                 t_family.RollBack()
