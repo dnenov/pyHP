@@ -81,8 +81,10 @@ for elem in elems:
 t.Commit()
 
 output.print_md(
-    f"### Unit Area Update Complete (Selection Only)\n"
-    f"- Selected elements: **{len(elems)}**\n"
-    f"- Updated Generic Models: **{updated}**\n"
-    f"- Skipped (wrong category / missing params / invalid height): **{skipped}**"
+    "### Unit Area Update Complete (Selection Only)\n"
+    "- Selected elements: **{}**\n"
+    "- Updated Generic Models: **{}**\n"
+    "- Skipped (wrong category / missing params / invalid height): **{}**".format(
+        len(elems), updated, skipped
+    )
 )
