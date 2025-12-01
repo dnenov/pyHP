@@ -66,9 +66,9 @@ for elem in elems:
         continue
 
     try:
-        vol_val = vol_param.AsDouble()  # internal units (ft³)
+        vol_val = vol_param.AsDouble()  # internal units 
 
-        # Area in internal units (ft²) = V (ft³) / h (ft)
+        # Area in internal units 
         area_val = vol_val / height_internal
 
         area_param.Set(area_val)
