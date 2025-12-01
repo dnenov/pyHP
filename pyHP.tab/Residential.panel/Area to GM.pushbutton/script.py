@@ -1,5 +1,5 @@
 __title__ = "Area to\n Generic Model"
-__doc__ = "Calculate area of Generic Model families."
+__doc__ = "Calculate area of Generic Model families. Make sure shared parameter Unit Area Instance is set to dimensions in the revit family and Formula tab is empty"
 
 from pyrevit import revit, DB, script, forms
 
