@@ -89,14 +89,14 @@ if selected_option == "1. Load Family Parameters":
         # Check for existing Unit Area Instance parameter and its group
         family_mgr = family_doc.FamilyManager
         existing_param = None
-        param_in_dimensions = False
+        param_in_general = False
         
         for param in family_mgr.Parameters:
             if param.Definition.Name == AREA_PARAM_NAME:
                 existing_param = param
-                # Check if it's in Dimensions/Geometry group
-                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GEOMETRY:
-                    param_in_dimensions = True
+                # Check if it's in General group
+                if param.Definition.ParameterGroup == DB.BuiltInParameterGroup.PG_GENERAL:
+                    param_in_general = True
                 break
         
         # Load shared parameter into family
@@ -130,19 +130,19 @@ if selected_option == "1. Load Family Parameters":
             t_family.Start()
             
             try:
-                # If parameter exists but is in wrong group (Text), delete it
-                if existing_param and not param_in_dimensions:
+                # If parameter exists but is in wrong group (Text or other), delete it
+                if existing_param and not param_in_general:
                     family_mgr.RemoveParameter(existing_param)
-                    logger.debug("Removed Unit Area Instance from Text group in family: {}".format(family.Name))
+                    logger.debug("Removed Unit Area Instance from wrong group in family: {}".format(family.Name))
                 
-                # If parameter doesn't exist or was in wrong group, add it to Dimensions
-                if not param_in_dimensions:
+                # If parameter doesn't exist or was in wrong group, add it to General
+                if not param_in_general:
                     new_param = family_mgr.AddParameter(
                         area_def,
-                        DB.BuiltInParameterGroup.PG_GEOMETRY,  # Dimensions/Geometry group
+                        DB.BuiltInParameterGroup.PG_GENERAL,  # General group
                         True  # Instance parameter
                     )
-                    logger.debug("Added Unit Area Instance to Dimensions group in family: {}".format(family.Name))
+                    logger.debug("Added Unit Area Instance to General group in family: {}".format(family.Name))
                 
                 t_family.Commit()
                 
