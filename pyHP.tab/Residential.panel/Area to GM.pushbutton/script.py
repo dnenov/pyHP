@@ -9,11 +9,82 @@ from pyrevit import revit, DB, script
 
 doc = revit.doc
 uidoc = revit.uidoc
+app = revit.app
 logger = script.get_logger()
 output = script.get_output()
 
 AREA_PARAM_NAME = "Unit Area Instance"   # Project shared parameter (Area)
 
+# Get selection
+selection_ids = list(uidoc.Selection.GetElementIds())
+if not selection_ids:
+    output.print_md("**No elements selected. Select Generic Models and run again.**")
+    script.exit()
+
+elems = [doc.GetElement(eid) for eid in selection_ids]
+
+# Step 1: Add Unit Area Instance as project parameter (if not already exists)
+output.print_md("### Step 1: Adding Unit Area Instance as Project Parameter\n")
+
+# Check if parameter already exists as project parameter
+param_exists = False
+binding_map = doc.ParameterBindings
+iterator = binding_map.ForwardIterator()
+while iterator.MoveNext():
+    definition = iterator.Key
+    if definition.Name == AREA_PARAM_NAME:
+        param_exists = True
+        break
+
+if not param_exists:
+    try:
+        # Get shared parameter file
+        shared_param_file = app.OpenSharedParameterFile()
+        if shared_param_file is None:
+            output.print_md("**Warning: No shared parameter file is set. Please set it in Revit Options.**")
+            script.exit()
+        
+        # Find Unit Area Instance parameter definition
+        area_def = None
+        for group in shared_param_file.Groups:
+            for defn in group.Definitions:
+                if defn.Name == AREA_PARAM_NAME:
+                    area_def = defn
+                    break
+            if area_def:
+                break
+        
+        if not area_def:
+            output.print_md("**Warning: 'Unit Area Instance' shared parameter not found in shared parameter file.**")
+            script.exit()
+        
+        # Create category set for Generic Model
+        cat_set = DB.CategorySet()
+        generic_model_cat = doc.Settings.Categories.get_Item(DB.BuiltInCategory.OST_GenericModel)
+        cat_set.Insert(generic_model_cat)
+        
+        # Create instance binding
+        binding = app.Create.NewInstanceBinding(cat_set)
+        
+        # Add as project parameter
+        t = DB.Transaction(doc, "Add Unit Area Instance Project Parameter")
+        t.Start()
+        try:
+            binding_map.Insert(area_def, binding)
+            t.Commit()
+            output.print_md("**Successfully added 'Unit Area Instance' as project parameter for Generic Model category.**\n")
+        except Exception as e:
+            t.RollBack()
+            output.print_md("**Error adding project parameter: {}**\n".format(e))
+            logger.debug("Error: {}".format(e))
+    except Exception as e:
+        output.print_md("**Error accessing shared parameter file: {}**\n".format(e))
+        logger.debug("Error: {}".format(e))
+else:
+    output.print_md("**'Unit Area Instance' parameter already exists as project parameter.**\n")
+
+# Step 2: Calculate area (existing functionality)
+output.print_md("### Step 2: Calculating Unit Area\n")
 
 def get_volume_param(elem):
     # Try built-in volume first
@@ -25,15 +96,6 @@ def get_volume_param(elem):
     if vol2 and vol2.HasValue:
         return vol2
     return None
-
-
-# Get selection
-selection_ids = list(uidoc.Selection.GetElementIds())
-if not selection_ids:
-    output.print_md("**No elements selected. Select Generic Models and run again.**")
-    script.exit()
-
-elems = [doc.GetElement(eid) for eid in selection_ids]
 
 updated = 0
 skipped = 0
@@ -81,10 +143,12 @@ for elem in elems:
 t.Commit()
 
 output.print_md(
-    "### Unit Area Update Complete (Selection Only)\n"
+    "**Step 2 Complete:**\n"
     "- Selected elements: **{}**\n"
     "- Updated Generic Models: **{}**\n"
-    "- Skipped (wrong category / missing params / invalid height): **{}**".format(
+    "- Skipped (wrong category / missing params / invalid height): **{}**\n".format(
         len(elems), updated, skipped
     )
 )
+
+output.print_md("\n### All Steps Complete!")
