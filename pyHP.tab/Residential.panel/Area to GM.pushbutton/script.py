@@ -2,7 +2,6 @@ __title__ = "Area to\n Generic Model"
 __doc__ = "Step 1: Load Unit Area Instance parameter into family (General group) and reload. Step 2: Calculate area of Generic Model families."
 
 from pyrevit import revit, DB, script, forms
-import os
 
 doc = revit.doc
 uidoc = revit.uidoc
@@ -11,6 +10,17 @@ logger = script.get_logger()
 output = script.get_output()
 
 AREA_PARAM_NAME = "Unit Area Instance"   # Shared parameter to add to family
+
+# Custom FamilyLoadOptions class for reloading families
+class SimpleLoadOptions(DB.IFamilyLoadOptions):
+    def OnFamilyFound(self, familyInUse, overwriteParameterValues):
+        overwriteParameterValues.value = True
+        return True
+
+    def OnSharedFamilyFound(self, sharedFamily, familyInUse, source, overwriteParameterValues):
+        overwriteParameterValues.value = True
+        source.value = DB.FamilySource.Family
+        return True
 
 # Show menu to select action
 menu_options = [
@@ -45,87 +55,71 @@ if selected_option == "1. Load Family Parameters":
 
     output.print_md("### Loading Unit Area Instance Parameter into Families\n")
 
-    # First, check shared parameter file
-    try:
-        shared_param_file = app.OpenSharedParameterFile()
-        if shared_param_file is None:
-            forms.alert("No shared parameter file is set. Please set it in Revit Options.", title="Error")
-            script.exit()
-        
-        # Find Unit Area Instance parameter definition
-        area_def = None
-        for group in shared_param_file.Groups:
-            for defn in group.Definitions:
-                if defn.Name == AREA_PARAM_NAME:
-                    area_def = defn
-                    break
-            if area_def:
+    # Get shared parameter file
+    spfile = app.OpenSharedParameterFile()
+    if not spfile:
+        forms.alert("No shared parameter file is loaded.\nSet it in Revit first (Manage > Shared Parameters).", 
+                    title="Error", exitscript=True)
+    
+    # Find Unit Area Instance parameter definition
+    area_def = None
+    for group in spfile.Groups:
+        for defn in group.Definitions:
+            if defn.Name == AREA_PARAM_NAME:
+                area_def = defn
                 break
-        
-        if not area_def:
-            forms.alert("'Unit Area Instance' shared parameter not found in shared parameter file.", title="Error")
-            script.exit()
-        
-        output.print_md("**Shared parameter '{}' found in shared parameter file.**\n".format(AREA_PARAM_NAME))
-    except Exception as e:
-        forms.alert("Error accessing shared parameter file: {}".format(e), title="Error")
-        script.exit()
+        if area_def:
+            break
+    
+    if not area_def:
+        forms.alert("'Unit Area Instance' shared parameter not found in shared parameter file.", 
+                    title="Error", exitscript=True)
+    
+    output.print_md("**Shared parameter '{}' found in shared parameter file.**\n".format(AREA_PARAM_NAME))
 
+    # Collect unique families from selection
+    families = set()
     for elem in elems:
         # Only Generic Models
         if elem.Category is None or elem.Category.Id.IntegerValue != int(DB.BuiltInCategory.OST_GenericModel):
             continue
         
-        if not isinstance(elem, DB.FamilyInstance):
-            continue
-        
-        family = elem.Symbol.Family
-        family_id = family.Id
-        
-        # Skip if we've already processed this family
-        if family_id in families_processed:
-            continue
-        
-        families_processed.add(family_id)
+        if isinstance(elem, DB.FamilyInstance):
+            families.add(elem.Symbol.Family)
+        elif isinstance(elem, DB.FamilySymbol):
+            families.add(elem.Family)
+    
+    if not families:
+        forms.alert("No Generic Model families found in selection.", title="Error", exitscript=True)
+    
+    families = list(families)
+
+    # Process each family
+    for family in families:
+        fam_name = family.Name
         
         # Check if family is editable (not in-place)
         if family.IsInPlace:
-            output.print_md("**Skipping in-place family: {}**\n".format(family.Name))
+            output.print_md("**Skipping in-place family: {}**\n".format(fam_name))
             families_skipped += 1
             continue
         
-        # Get family document path
-        family_doc = None
         try:
-            # Try to get family file path
-            family_path = DB.FamilyPathUtils.GetFamilyPath(doc, family_id)
-            if not os.path.exists(family_path):
-                output.print_md("**Family file not found: {}**\n".format(family_path))
-                families_skipped += 1
-                continue
+            # Open family document using EditFamily (better than opening file path)
+            family_doc = doc.EditFamily(family)
+            family_mgr = family_doc.FamilyManager
             
-            # Open family document
-            family_doc = app.OpenDocumentFile(family_path)
-            output.print_md("**Processing family: {}**\n".format(family.Name))
-        except Exception as e:
-            error_msg = "Could not open family document for {}: {}".format(family.Name, e)
-            output.print_md("**{}**\n".format(error_msg))
-            logger.debug(error_msg)
-            families_skipped += 1
-            continue
-        
-        # Check for existing Unit Area Instance parameter (any group)
-        family_mgr = family_doc.FamilyManager
-        existing_param = None
-        
-        for param in family_mgr.Parameters:
-            if param.Definition.Name == AREA_PARAM_NAME:
-                existing_param = param
-                output.print_md("  - Found existing parameter in {} group\n".format(param.Definition.ParameterGroup))
-                break
-        
-        # Process family parameter
-        try:
+            output.print_md("**Processing family: {}**\n".format(fam_name))
+            
+            # Check for existing Unit Area Instance parameter (any group)
+            existing_param = None
+            for param in family_mgr.Parameters:
+                if param.Definition.Name == AREA_PARAM_NAME:
+                    existing_param = param
+                    output.print_md("  - Found existing parameter in {} group\n".format(param.Definition.ParameterGroup))
+                    break
+            
+            # Start transaction inside the family doc
             t_family = DB.Transaction(family_doc, "Update Unit Area Instance Parameter")
             t_family.Start()
             
@@ -134,7 +128,7 @@ if selected_option == "1. Load Family Parameters":
                 if existing_param:
                     family_mgr.RemoveParameter(existing_param)
                     output.print_md("  - Deleted existing parameter\n")
-                    logger.debug("Deleted existing Unit Area Instance parameter from family: {}".format(family.Name))
+                    logger.info("Deleted existing Unit Area Instance parameter from family: {}".format(fam_name))
                 
                 # Always add parameter to General group
                 new_param = family_mgr.AddParameter(
@@ -143,53 +137,43 @@ if selected_option == "1. Load Family Parameters":
                     True  # Instance parameter
                 )
                 output.print_md("  - Added parameter to General group\n")
-                logger.debug("Added Unit Area Instance to General group in family: {}".format(family.Name))
+                logger.info("Added Unit Area Instance to General group in family: {}".format(fam_name))
                 families_updated += 1
                 
                 t_family.Commit()
                 
-                # Save family
-                save_opts = DB.SaveAsOptions()
-                save_opts.OverwriteExistingFile = True
-                family_doc.SaveAs(family_path, save_opts)
-                output.print_md("  - Family saved\n")
+                # Load modified family back into project using custom load options
+                load_opt = SimpleLoadOptions()
+                family_doc.LoadFamily(doc, load_opt)
+                family_doc.Close(False)
                 
-                # Reload family into project
-                reload_opts = DB.FamilyLoadOptions()
-                reload_opts.OnFamilyFound = DB.FamilyLoadOptions.OnFamilyFoundAction.UseExisting
-                doc.LoadFamily(family_path, reload_opts)
                 output.print_md("  - Family reloaded into project\n")
                 
             except Exception as e:
                 t_family.RollBack()
-                error_msg = "Failed to update Unit Area Instance parameter in family {}: {}".format(family.Name, e)
+                error_msg = "Failed to update Unit Area Instance parameter in family {}: {}".format(fam_name, e)
                 output.print_md("**ERROR: {}**\n".format(error_msg))
-                logger.debug(error_msg)
+                logger.error(error_msg)
                 error_messages.append(error_msg)
                 families_skipped += 1
-            
-            finally:
-                if family_doc:
-                    family_doc.Close(False)
-        
-        except Exception as e:
-            error_msg = "Error processing family {}: {}".format(family.Name, e)
-            output.print_md("**ERROR: {}**\n".format(error_msg))
-            logger.debug(error_msg)
-            error_messages.append(error_msg)
-            families_skipped += 1
-            if family_doc:
                 try:
                     family_doc.Close(False)
                 except:
                     pass
+        
+        except Exception as e:
+            error_msg = "Error processing family {}: {}".format(fam_name, e)
+            output.print_md("**ERROR: {}**\n".format(error_msg))
+            logger.error(error_msg)
+            error_messages.append(error_msg)
+            families_skipped += 1
 
     output.print_md(
         "\n**Step 1 Complete:**\n"
         "- Families processed: **{}**\n"
         "- Families updated: **{}**\n"
         "- Families skipped: **{}**\n".format(
-            len(families_processed), families_updated, families_skipped
+            len(families), families_updated, families_skipped
         )
     )
     
@@ -204,7 +188,7 @@ if selected_option == "1. Load Family Parameters":
         "Families updated: {}\n"
         "Families skipped: {}\n\n"
         "Check output panel for details.".format(
-            len(families_processed), families_updated, families_skipped
+            len(families), families_updated, families_skipped
         ),
         title="Load Family Parameters Complete"
     )
