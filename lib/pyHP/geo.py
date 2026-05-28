@@ -4,6 +4,15 @@ from pyrevit.framework import List
 from pyHP import database
 from Autodesk.Revit import Exceptions
 
+# BuiltInParameterGroup and ParameterType enums were removed in Revit 2025;
+# GroupTypeId / SpecTypeId (ForgeTypeId) are the replacements
+if HOST_APP.is_newer_than(2022):
+    _MAT_GROUP = DB.GroupTypeId.Materials
+    _MAT_SPEC = DB.SpecTypeId.Reference.Material
+else:
+    _MAT_GROUP = DB.BuiltInParameterGroup.PG_MATERIALS
+    _MAT_SPEC = DB.ParameterType.Material
+
 
 
 def inverted_transform(element, view=revit.active_view):
@@ -343,8 +352,8 @@ def room_to_freeform(r, family_doc):
             # create and associate a material parameter
             ext_mat_param = freeform.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
             new_mat_param = family_doc.FamilyManager.AddParameter("Material",
-                                                                  DB.BuiltInParameterGroup.PG_MATERIALS,
-                                                                  DB.ParameterType.Material,
+                                                                  _MAT_GROUP,
+                                                                  _MAT_SPEC,
                                                                   True)
             family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param,
                                                                                 new_mat_param)
@@ -371,8 +380,8 @@ def room_to_extrusion(r, family_doc):
         ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
         # create and associate a material parameter
         new_mat_param = family_doc.FamilyManager.AddParameter("Material",
-                                                              DB.BuiltInParameterGroup.PG_MATERIALS,
-                                                              DB.ParameterType.Material,
+                                                              _MAT_GROUP,
+                                                              _MAT_SPEC,
                                                               False)
         family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param,
                                                                             new_mat_param)

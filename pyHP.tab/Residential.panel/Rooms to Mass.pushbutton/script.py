@@ -92,9 +92,14 @@ if selection:
                     # create and associate a material parameter
 
                     ext_mat_param = freeform.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+                    # BuiltInParameterGroup was removed in Revit 2025; GroupTypeId (ForgeTypeId) is the replacement
+                    if HOST_APP.is_newer_than(2022):
+                        mat_group = DB.GroupTypeId.Materials
+                    else:
+                        mat_group = DB.BuiltInParameterGroup.PG_MATERIALS
                     try:
                         new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
-                                                                                  DB.BuiltInParameterGroup.PG_MATERIALS,
+                                                                                  mat_group,
                                                                                   False)
                         new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param,
                                                                                                 new_mat_param)

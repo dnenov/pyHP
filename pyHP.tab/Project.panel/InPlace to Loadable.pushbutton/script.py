@@ -119,9 +119,17 @@ with revit.Transaction("Load Family", revit.doc):
 with revit.Transaction(doc=new_family_doc, name="Copy Geometry"):
 
     parent_cat = new_family_doc.OwnerFamily.FamilyCategory
+    # BuiltInParameterGroup and ParameterType enums were removed in Revit 2025;
+    # GroupTypeId / SpecTypeId (ForgeTypeId) are the replacements
+    if HOST_APP.is_newer_than(2022):
+        mat_group = DB.GroupTypeId.Materials
+        mat_spec = DB.SpecTypeId.Reference.Material
+    else:
+        mat_group = DB.BuiltInParameterGroup.PG_MATERIALS
+        mat_spec = DB.ParameterType.Material
     new_mat_param = new_family_doc.FamilyManager.AddParameter("Material",
-                                                              DB.BuiltInParameterGroup.PG_MATERIALS,
-                                                              DB.ParameterType.Material,
+                                                              mat_group,
+                                                              mat_spec,
                                                               False)
 
     for geo in solids_dict.keys():

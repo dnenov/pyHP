@@ -188,8 +188,13 @@ def room_to_extrusion(r, family_doc,output):
 def assign_material_param(extrusion, mat_param, fam_doc):
     ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
     # create and associate a material parameter
+    # BuiltInParameterGroup was removed in Revit 2025; GroupTypeId (ForgeTypeId) is the replacement
+    if HOST_APP.is_newer_than(2022):
+        mat_group = DB.GroupTypeId.Materials
+    else:
+        mat_group = DB.BuiltInParameterGroup.PG_MATERIALS
     new_mat_param = fam_doc.FamilyManager.AddParameter(mat_param,
-                                                              DB.BuiltInParameterGroup.PG_MATERIALS, False)
+                                                              mat_group, False)
     fam_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param,
                                                                         new_mat_param)
     return extrusion

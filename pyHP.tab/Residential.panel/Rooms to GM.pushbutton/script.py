@@ -7,6 +7,8 @@ import tempfile
 import helper
 import re
 import sys
+import os
+import uuid
 
 
 logger = script.get_logger()
@@ -47,6 +49,29 @@ def get_external_definition_by_name(name):
 
 
 if selection:
+    # Verify required shared parameter definitions exist up-front so we fail with a
+    # clear message instead of a null-ref deep inside the family creation loop.
+    required_defs = ["Unit Area", "Unit Area Instance"]
+    missing_defs = [n for n in required_defs if get_external_definition_by_name(n) is None]
+    if missing_defs:
+        forms.alert(
+            msg="Missing shared parameter(s)",
+            sub_msg="The following shared parameter definition(s) are not in the current shared "
+                    "parameter file: {0}.\n\nAdd them (Area type) via Manage > Shared Parameters, "
+                    "then run again.".format(", ".join(missing_defs)),
+            ok=True,
+            warn_icon=True,
+            exitscript=True,
+        )
+
+    # Per-run session subfolder for the .rfa files. Revit locks .rfa paths that
+    # were loaded into the project, so reusing a fixed temp path across runs
+    # raises "File has been opened by another Revit instance" on SaveAs.
+    session_dir = os.path.join(
+        tempfile.gettempdir(), "pyHP_RoomsToGM_" + uuid.uuid4().hex[:8]
+    )
+    os.makedirs(session_dir)
+
     # Create family doc from template
     # get file template from location
     fam_template_path = __revit__.Application.FamilyTemplatePath + "\Metric Generic Model.rft"
@@ -138,8 +163,11 @@ if selection:
         while helper.get_fam(fam_name):
             fam_name = fam_name + "_Copy 1"
 
-        # Save family in temp folder
-        fam_path = tempfile.gettempdir() + "/" + fam_name + ".rfa"
+        # Save family in the per-run session subfolder (created above). Re-using
+        # the bare TEMP path collides with .rfa files still loaded into the project
+        # from a prior run, which Revit locks
+        # ("File has been opened by another Revit instance").
+        fam_path = os.path.join(session_dir, fam_name + ".rfa")
         saveas_opt = DB.SaveAsOptions()
         saveas_opt.OverwriteExistingFile = True
         new_family_doc.SaveAs(fam_path, saveas_opt)
@@ -162,7 +190,11 @@ if selection:
 
             # parameter definition
             external_parameter_definition = get_external_definition_by_name("Unit Area")
-            builtin_param_group = DB.BuiltInParameterGroup.PG_TEXT
+            # BuiltInParameterGroup was removed in Revit 2025; GroupTypeId (ForgeTypeId) is the replacement
+            if HOST_APP.is_newer_than(2022):
+                builtin_param_group = DB.GroupTypeId.Text
+            else:
+                builtin_param_group = DB.BuiltInParameterGroup.PG_TEXT
             is_instance_parameter = False
 
             # create new family parameter

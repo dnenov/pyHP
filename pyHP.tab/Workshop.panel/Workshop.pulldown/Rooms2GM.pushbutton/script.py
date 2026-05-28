@@ -12,7 +12,13 @@ logger = script.get_logger()
 # get shared parameter for the extrusion material
 
 
-sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", DB.ParameterType.Material)
+# ParameterType enum was removed in Revit 2025; SpecTypeId (ForgeTypeId) is the replacement
+if HOST_APP.is_newer_than(2022):
+    parameter_type = DB.SpecTypeId.Reference.Material
+else:
+    parameter_type = DB.ParameterType.Material
+
+sp_unit_material = helper.get_shared_param_by_name_type("Unit Material", parameter_type)
 if not sp_unit_material:
     forms.alert(msg="No suitable parameter", \
         sub_msg="There is no suitable parameter to use for Unit Material. Please add a shared parameter 'Unit Material' of Material Type", \
@@ -194,9 +200,14 @@ if selection:
                 extrusion = new_family_doc.FamilyCreate.NewExtrusion(True, room_boundaries, ref_plane[0],
                                                                          extrusion_height)
                 ext_mat_param = extrusion.get_Parameter(DB.BuiltInParameter.MATERIAL_ID_PARAM)
+                # BuiltInParameterGroup was removed in Revit 2025; GroupTypeId (ForgeTypeId) is the replacement
+                if HOST_APP.is_newer_than(2022):
+                    mat_group = DB.GroupTypeId.Materials
+                else:
+                    mat_group = DB.BuiltInParameterGroup.PG_MATERIALS
                 try:
                     new_mat_param = new_family_doc.FamilyManager.AddParameter(sp_unit_material,
-                    DB.BuiltInParameterGroup.PG_MATERIALS, False)
+                    mat_group, False)
                     new_family_doc.FamilyManager.AssociateElementParameterToFamilyParameter(ext_mat_param, new_mat_param)
                 except Exception as err:
                     logger.error(err)
